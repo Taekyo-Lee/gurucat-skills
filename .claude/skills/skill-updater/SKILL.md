@@ -305,28 +305,40 @@ user's files — always get explicit consent.
 
 Never modify the user's skill without a backup. This is non-negotiable.
 
-### Git flow (git available and skill is in a repo)
+**Important:** The backup must capture the user's actual working-tree state,
+including uncommitted changes. A `git branch` only captures committed state —
+it will miss uncommitted user customizations. Always do a file-based backup
+to be safe.
 
-1. If there are uncommitted changes in the working tree, stash them:
-   ```bash
-   git stash push -m "skill-updater: stash before updating <skill-name>"
-   ```
+### Step 1: File-based backup (always do this)
 
-2. Create a backup branch from the current state:
-   ```bash
-   git branch pre-update-<skill-name>-<YYYYMMDD>
-   ```
-   Example: `pre-update-code-review-20260408`
+Regardless of whether git is available, copy the skill folder:
+```bash
+cp -r path/to/<skill-name> path/to/<skill-name>.backup-<YYYYMMDD>
+```
+This captures the exact working-tree state, including uncommitted edits.
+Verify the backup succeeded before proceeding. If it fails, stop.
 
-### File flow (no git, or skill outside a repo)
+### Step 2: Git snapshot (if git is available)
 
-1. Copy the entire skill folder to a backup location next to the skill:
-   ```bash
-   cp -r path/to/<skill-name> path/to/<skill-name>.backup-<YYYYMMDD>
-   ```
+If the skill is in a git repo AND there are uncommitted changes:
+```bash
+# Commit the user's current state as a snapshot
+git add path/to/<skill-name>/
+git commit -m "skill-updater: pre-update snapshot of <skill-name>"
 
-Confirm the backup succeeded before proceeding. If backup fails, stop and tell
-the user.
+# Create the backup branch from this snapshot
+git branch pre-update-<skill-name>-<YYYYMMDD>
+```
+
+If the working tree is clean (no uncommitted changes), just create the branch:
+```bash
+git branch pre-update-<skill-name>-<YYYYMMDD>
+```
+
+The file-based backup (Step 1) is the primary recovery mechanism. The git
+branch is a convenience for `--revert` but is not sufficient on its own when
+the user has uncommitted changes.
 
 ---
 
@@ -501,30 +513,42 @@ secondary context — most users only care about the per-skill version.
 
 When the user runs `/skill-updater --revert <skill-name>`:
 
-### Git flow
+### Step 1: Find the backup
 
-1. Find the backup branch:
-   ```bash
-   git branch --list "pre-update-<skill-name>-*" --sort=-creatordate
-   ```
-   Use the most recent one.
+Check for backups in this order (file-based is preferred because it always
+captures the full working-tree state):
 
-2. Restore the skill folder from that branch:
+1. **File-based backup** — look for `<skill-name>.backup-*` sibling directory:
    ```bash
-   git checkout <backup-branch> -- path/to/<skill-name>/
+   ls -d path/to/<skill-name>.backup-* 2>/dev/null | sort -r | head -1
    ```
 
-3. Commit the revert:
+2. **Git backup branch** — if no file backup found:
    ```bash
-   git commit -m "skill-updater: revert <skill-name> to pre-update version
-
-   Restored from backup branch <backup-branch>."
+   git branch --list "pre-update-<skill-name>-*" --sort=-creatordate | head -1
    ```
 
-### File flow
+### Step 2: Restore
 
-1. Find the backup folder (most recent `<skill-name>.backup-*` sibling directory).
-2. Replace the skill folder with the backup copy.
+**From file backup (preferred):**
+```bash
+rm -rf path/to/<skill-name>
+cp -r path/to/<skill-name>.backup-<YYYYMMDD> path/to/<skill-name>
+```
+
+**From git branch (fallback):**
+```bash
+git checkout <backup-branch> -- path/to/<skill-name>/
+```
+
+### Step 3: Commit (git flow only)
+
+```bash
+git add path/to/<skill-name>/
+git commit -m "skill-updater: revert <skill-name> to pre-update version
+
+Restored from backup."
+```
 
 ### Report
 
