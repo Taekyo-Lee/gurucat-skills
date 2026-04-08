@@ -4,6 +4,12 @@ description: Applies Anthropic's official brand colors and typography to any sor
 license: Complete terms in LICENSE.txt
 metadata:
   version: "1.1.0"
+  source:
+    repo: "Taekyo-Lee/my-skills"
+    url: "https://github.com/Taekyo-Lee/my-skills"
+    path: ".claude/skills/brand-guidelines"
+    repo_tag: "v1.1.0"
+    updated_at: "2026-04-08"
 ---
 
 # Anthropic Brand Styling
@@ -28,7 +34,7 @@ To access Anthropic's official brand identity and style resources, use this skil
 **Accent Colors:**
 
 - Orange: `#d97757` - Primary accent
-- Blue: `#6a9bcc` - Secondary accent
+- Blue: `#1428a0` - Samsung Blue (customized)
 - Green: `#788c5d` - Tertiary accent
 
 ### Dark Mode
