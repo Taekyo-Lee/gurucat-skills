@@ -3,7 +3,7 @@ name: brand-guidelines
 description: Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.
 license: Complete terms in LICENSE.txt
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Anthropic Brand Styling
@@ -30,6 +30,14 @@ To access Anthropic's official brand identity and style resources, use this skil
 - Orange: `#d97757` - Primary accent
 - Blue: `#6a9bcc` - Secondary accent
 - Green: `#788c5d` - Tertiary accent
+
+### Dark Mode
+
+When creating dark-themed artifacts:
+- Use Dark (#141413) as the background
+- Use Light (#faf9f5) for text
+- Accent colors remain the same
+- Reduce opacity of Mid Gray to 60% for subtle borders
 
 ### Typography
 
@@ -67,6 +75,7 @@ To access Anthropic's official brand identity and style resources, use this skil
 - Provides automatic fallback to Arial (headings) and Georgia (body)
 - No font installation required - works with existing system fonts
 - For best results, pre-install Poppins and Lora fonts in your environment
+- Supports variable font weights (300-700) when Poppins variable font is installed
 
 ### Color Application
 
