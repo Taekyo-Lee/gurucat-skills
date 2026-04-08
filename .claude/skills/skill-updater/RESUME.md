@@ -6,57 +6,61 @@ We're building a `skill-updater` skill at `.claude/skills/skill-updater/`. Read 
 
 ## What's been done
 
-- `plan.md` — design doc with problem statement, design decisions, workflow diagram, scenarios, and repo structure. Updated with real-world scenarios and repo-level tagging.
-- `SKILL.md` — draft skill instructions covering all 5 phases (pre-flight, backup, detect changes, apply update, verify & report), plus revert flow, check-all flow, and error handling. Supports git flow and file flow, multi-tool directories, 6-strategy fetch chain, and PAT handling.
+- `plan.md` — design doc with problem statement, design decisions, workflow diagram, scenarios, and repo structure. Updated with real-world scenarios and repo-level tagging. Versioning decision updated to reflect two-level model.
+- `SKILL.md` — full skill instructions covering all 5 phases (pre-flight, backup, detect changes, apply update, verify & report), plus revert flow, check-all flow, and error handling. Supports git flow and file flow, multi-tool directories, 6-strategy fetch chain, and PAT handling.
+- `SKILL.md` versioning model reconciled — uses both `metadata.version` (per-skill, set by author) and `metadata.source.repo_tag` (repo-wide, managed by skill-updater). Flow: compare repo_tag for new releases → diff skill files between tags → read upstream `metadata.version` for per-skill version bump.
+- Fetch chain simplified from 6 strategies to 5 by integrating `gh` CLI. `gh` replaces the two separate curl-based GitHub API strategies (with/without PAT) — it handles auth transparently via credential store, `GH_TOKEN`, and device flow. Supports GitHub Enterprise. Chain: git → `gh` CLI → raw URL → local path → ask user.
+- Comprehensive environment detection (Phase 1.2) — builds a full capability profile (`has_git`, `has_gh`, `gh_authed`, `has_token`, `has_network`, `has_source`) so the fetch chain can skip unavailable strategies immediately.
+- Hardened fetch chain (Phase 1.4) — each strategy now has documented prerequisites, failure modes with symptoms, user-facing messages, and explicit fallthrough triggers. Covers: credential hangs, SSH failures, token expiry/revocation, SSO/SAML, wrong scopes, rate limits, corporate proxies, air-gapped environments, partial downloads, `gh` too old, and all-strategies-failed terminal state.
+- Expanded error handling section — organized by category (tool availability, auth, network, source metadata, skill structure, safety) with specific error → action mappings for every known edge case.
+- Origin classification system (Phase 1.1) — classifies skills into 9 origin types (A through I) covering: git-cloned, downloaded, coworker-shared with/without metadata, found online, user-authored, AI-generated, forked/diverged, and non-GitHub sources. Each type has a defined update strategy. Includes interactive stamping workflow for skills with unknown origins.
+- Early-exit gates in fetch chain for origins with no upstream (user-authored, AI-generated, unknown source that user can't identify).
+- `--check` table updated to show origin-aware status values (Local, Unknown source, Non-GitHub source, Check failed).
+- plan.md expanded with Scenarios 9–12: user-authored skills, non-GitHub sources, unknown-source skills, and heavily-diverged forks.
+- SKILL.md refactored from 847 → 586 lines (down from 847) by extracting detailed reference material into 4 new reference files, then refined with skill-creator review improvements.
+- Skill-creator review applied: added happy-path overview at top, user confirmation step (Phase 1.7), simplified origins from 9 → 6 types, beefed up Phase 4 with inline merge guidance for top 3 patterns, improved description for aggressive triggering, added single-skill repo handling, tightened `--check` flow (batch API calls, partial failure resilience).
+- `references/origin-classification.md` — 9 origin types (A–I), 3-step classification flow, interactive stamping workflow for unknown origins.
+- `references/environment-detection.md` — full capability profile procedure, per-check commands, capability table.
+- `references/fetch-strategies.md` — per-strategy prerequisites, commands, failure mode tables, and fallthrough triggers.
+- `references/error-handling.md` — error → action lookup tables organized by category (tools, auth, network, metadata, structure, safety).
 - `references/resolution-strategies.md` — conflict resolution guidance for common merge patterns.
 - `scripts/check-versions.sh` — semver comparison helper script.
 
 ## What needs to happen next
 
-### 1. Reconcile the two-level versioning model
+### ~~1. Reconcile the two-level versioning model~~ DONE
 
-The plan has **per-skill versions** in each SKILL.md frontmatter (`metadata.version: "1.2.0"`). We also added **repo-wide tags** (`v2.5.0`) as the stable release marker. The SKILL.md currently only uses `metadata.source.repo_tag` and dropped `metadata.version`. We need BOTH:
+Completed. SKILL.md now uses both `metadata.version` (per-skill) and
+`metadata.source.repo_tag` (repo-wide). The update flow checks repo_tag first,
+diffs specific skill files between tags, then reads upstream `metadata.version`
+for the per-skill version bump display. Plan.md updated to match.
 
-- `metadata.version` — per-skill version (e.g., `1.2.0`), set by skill authors
-- `metadata.source.repo_tag` — repo-wide release tag the user last synced from (e.g., `v2.5.0`)
+### 2. Real-world testing at Samsung (2026-04-09)
 
-Update the SKILL.md to use both. The update flow should be:
-1. Compare `repo_tag` against latest repo tag → "is there a new release?"
-2. Diff the skill's files between tags → "did this skill actually change?"
-3. If changed, show the user the per-skill version bump: `code-review: v1.0.0 → v1.2.0`
+Minimal testing at home, then real-world testing at Samsung Electronics corporate
+environment. Samsung has strict security policies — expect failures around:
+- Corporate proxy blocking GitHub
+- `gh` CLI not installable
+- PAT restrictions
+- SSO/SAML requirements
+- VPN-only network access
 
-The `metadata.source` block in SKILL.md should look like:
-```yaml
-metadata:
-  version: "1.2.0"
-  source:
-    repo: "company/skill-browser"
-    url: "https://github.company.com/company/skill-browser"
-    path: "skills/code-review"
-    repo_tag: "v2.5.0"
-    updated_at: "2026-04-01"
-```
+**Testing plan:** Run the skill against real skills in the corporate environment.
+Each failure gets logged to `references/field-notes.md`, resolved with the user,
+and promoted into the main reference files. The skill self-evolves with each run.
 
-### 2. After fixing versioning, consider test cases
-
-The skill-creator workflow recommends writing 2-3 realistic test prompts and running them. Some scenarios to test:
-
-- User has git + remote, skill has source metadata, upstream has new tag with changes to the skill
-- User has no git, skill has source metadata pointing to a public GitHub repo
-- User has a skill with no `metadata.source` (got it from a coworker via Slack)
-- `/skill-updater --check` across multiple tools' skill directories
-- `/skill-updater --revert` after an update
-
-### 3. Open design questions
+### 3. Open design questions (lower priority — resolve during testing)
 
 - Should skill-updater also update ITSELF? (meta-update problem)
 - How should CHANGELOG.md be handled during merges? (append-only, so usually safe)
-- Should we support `--all` to update every skill that has updates? (plan says per-skill only, but `--check` + `--all` could be a workflow)
-- The `overrides.md` / layered override pattern from the plan — is this still relevant as a complementary approach?
+- Should we support `--all` to update every skill that has updates?
 
 ## Files to read
 
-1. `.claude/skills/skill-updater/plan.md` — full design doc
-2. `.claude/skills/skill-updater/SKILL.md` — current skill draft (needs versioning fix)
-3. `.claude/skills/skill-updater/references/resolution-strategies.md` — merge strategies
-4. `.claude/skills/skill-updater/scripts/check-versions.sh` — version comparison script
+1. `.claude/skills/skill-updater/SKILL.md` — core skill instructions (586 lines, compact with pointers to references)
+2. `.claude/skills/skill-updater/references/origin-classification.md` — origin types and stamping workflow
+3. `.claude/skills/skill-updater/references/environment-detection.md` — capability profile procedure
+4. `.claude/skills/skill-updater/references/fetch-strategies.md` — per-strategy details and failure modes
+5. `.claude/skills/skill-updater/references/error-handling.md` — error → action lookup tables
+6. `.claude/skills/skill-updater/references/resolution-strategies.md` — merge conflict resolution
+7. `.claude/skills/skill-updater/scripts/check-versions.sh` — version comparison script
