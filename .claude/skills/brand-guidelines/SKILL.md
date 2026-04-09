@@ -6,7 +6,7 @@ metadata:
   version: "1.1.0"
   source:
     repo: "Taekyo-Lee/my-skills"
-    url: "https://github.com/Taekyo-Lee/my-skills"
+    url: "https://github.samsungds.net/aiagent/experimental-skills"
     path: ".claude/skills/brand-guidelines"
     repo_tag: "v1.1.0"
     updated_at: "2026-04-08"
