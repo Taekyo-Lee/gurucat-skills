@@ -13,7 +13,7 @@ metadata:
   version: "1.0.0"
   author: "DevTools Team"
   source:
-    repo: "Taekyo-Lee/my-skills"
+    repo: "aiagent/experimental-skills"
     url: "https://github.samsungds.net/aiagent/experimental-skills"
     path: ".claude/skills/skill-updater"
     repo_tag: "v1.0.0"
