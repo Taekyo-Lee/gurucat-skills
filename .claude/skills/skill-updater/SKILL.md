@@ -1,19 +1,14 @@
 ---
 name: skill-updater
 description: >
-  Updates locally-customized Agent Skills to the latest upstream version while
-  preserving user customizations. Use this skill whenever the user wants to update
-  a skill, sync a skill with upstream, pull the latest version of a skill, check
-  if skills are outdated, or revert a skill update. Also use when the user mentions
-  "skill-updater", "update skills", "sync skills", "pull latest skill", "get the
-  latest version", or asks about skill versions. This skill should also be used when
-  someone says things like "is my skill up to date?", "there's a new version of X",
-  "my coworker updated the skill", "pull changes from the skill repo", or "I want
-  to check for skill updates". Even if the user doesn't say "skill" explicitly but
-  is clearly talking about updating agent instructions or tool configurations that
-  follow the SKILL.md standard, use this skill. Handles the fork maintenance
-  problem — users freely customize skills, and this skill intelligently merges
-  upstream updates without losing those customizations.
+  Manages Agent Skill lifecycle: update, check, and revert. Use this skill when
+  the user wants to (1) update a skill to the latest upstream version, (2) check
+  if any skills are outdated, or (3) undo/revert/restore a skill to its previous
+  state. Trigger on any intent related to skill versioning, syncing with upstream,
+  pulling latest changes, rolling back, or restoring a previous version — in any
+  language. Even if the user doesn't say "skill" explicitly, use this skill when
+  they are clearly talking about updating, reverting, or checking versions of
+  agent instructions that follow the SKILL.md standard.
 metadata:
   version: "1.0.0"
   author: "DevTools Team"
