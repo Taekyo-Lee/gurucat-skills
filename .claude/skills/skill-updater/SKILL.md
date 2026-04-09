@@ -608,7 +608,28 @@ cp -r path/to/<skill-name>.backup-<YYYYMMDD> path/to/<skill-name>
 git checkout <backup-branch> -- path/to/<skill-name>/
 ```
 
-### Step 3: Commit (git flow only)
+### Step 3: Clean up
+
+After a successful restore:
+
+1. **Delete the backup directory** — it's now a duplicate of the restored files:
+   ```bash
+   rm -rf path/to/<skill-name>.backup-<YYYYMMDD>
+   ```
+
+2. **Delete the local tag** that was reverted from — it's stale and will be
+   re-fetched from remote when needed:
+   ```bash
+   git tag -d <reverted-tag>
+   # e.g., git tag -d v1.1.0
+   ```
+
+3. **Delete the backup git branch** (if one exists):
+   ```bash
+   git branch -D pre-update-<skill-name>-<YYYYMMDD> 2>/dev/null
+   ```
+
+### Step 4: Commit (git flow only)
 
 ```bash
 git add path/to/<skill-name>/
@@ -623,6 +644,7 @@ Restored from backup."
 Reverted <skill-name> to your pre-update version
 (v<old-version> + your customizations).
 Upstream update discarded.
+Cleaned up: backup directory, local tag <reverted-tag>, backup branch.
 ```
 
 ---
