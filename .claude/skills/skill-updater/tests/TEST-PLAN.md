@@ -72,12 +72,29 @@ changes nothing. Run this first to verify the environment works.
 - [ ] Shows correct `metadata.source.repo_tag` for each (read from file on disk)
 - [ ] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
 - [ ] skill-updater shows "Up to date" (its files didn't change between repo tags v1.0.0 and v1.1.0)
-- [ ] Skills without `metadata.source` show appropriate status
-- [ ] Table is readable and well-formatted
+- [x] Skills without `metadata.source` show appropriate status
+- [x] Table is readable and well-formatted
 
 ### Actual result
 
-> (to be filled after testing)
+> **PASS** (2026-04-09, Samsung corporate environment)
+>
+> All criteria met:
+> - [x] Found both `brand-guidelines` and `skill-updater`
+> - [x] Correct `metadata.version` for each (1.0.0, read from file on disk)
+> - [x] Correct `metadata.source.repo_tag` for each (v1.0.0)
+> - [x] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
+> - [x] skill-updater shows "Up to date" (no changes between tags)
+> - [x] No skills without `metadata.source` in this environment
+> - [x] Table is readable and well-formatted
+>
+> Observations:
+> - Remote name is `internal`, not `origin` — AI handled it correctly by
+>   checking `git remote -v`. SKILL.md updated to not assume `origin`.
+> - `gh` CLI not available — skipped silently, used git instead.
+> - Used `git fetch internal --tags --force` (correct).
+> - `git show v1.1.0:...` used after force-fetch — acceptable since tags
+>   were just synced from remote.
 
 ---
 
