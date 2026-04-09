@@ -45,17 +45,45 @@ with upstream", parse the intent and proceed accordingly.
 
 ---
 
+## Fundamental Principle: The File on Disk is the Truth
+
+**The SKILL.md file on disk is the single source of truth. Git history is
+just a reference.**
+
+This principle governs every phase of skill-updater:
+
+| What | Where to look | NEVER use |
+|---|---|---|
+| Local state | Read the actual SKILL.md file on disk | `git show HEAD:...`, `git log`, commit history |
+| Local version | `metadata.version` inside the SKILL.md file | Git tags, commit messages |
+| Local repo_tag | `metadata.source.repo_tag` inside the SKILL.md file | Local git tags |
+| Base version | Fetch from the **remote** at the user's `repo_tag` | `git show <tag>:...` (local tag, potentially stale) |
+| Upstream version | Fetch from the **remote** at the latest tag | `git show <tag>:...` (local tag, potentially stale) |
+
+**Why this matters:** Users make commits, reverts, merges, and messy edits.
+Local git tags can become stale and point to wrong commits. Even if a perfect
+merge was committed a minute ago, the user may have reverted the files without
+committing. If skill-updater trusted git history, it would incorrectly say
+"already up to date" — but the file on disk says otherwise.
+
+The SKILL.md file is what the user actually sees and uses. That is the truth.
+Git is a tool for fetching remote content and creating backups, nothing more.
+
+---
+
 ## How it works (happy path)
 
 In the common case — a skill cloned from a GitHub repo with `metadata.source`
 intact — the flow looks like this:
 
-1. **Find the skill** and read its frontmatter. Classify its origin.
+1. **Find the skill** and read its SKILL.md file on disk. Classify its origin.
 2. **Check environment** — git, `gh`, network available?
-3. **Fetch the latest repo tag** and diff the skill's files between tags.
+3. **Fetch the latest repo tag from the remote** and fetch the upstream skill
+   files at that tag from the remote.
 4. **Show the user what changed** and ask to confirm before proceeding.
-5. **Back up** the current skill (git branch or file copy).
-6. **Compare three versions** — base (last sync), local (user's), upstream (new).
+5. **Back up** the current skill files (file copy, then optional git branch).
+6. **Compare three versions** — base (fetched from remote at user's repo_tag),
+   local (the actual file on disk), upstream (fetched from remote at latest tag).
 7. **Apply the update** — overwrite clean files, intelligently merge conflicts.
 8. **Verify and report** — validate structure, commit, show summary.
 
@@ -190,10 +218,15 @@ commands, and capability profile table.
 
 ### 1.3 Read local version info
 
-Parse the `SKILL.md` frontmatter to extract:
+**Read the actual SKILL.md file on disk** (not from git history) and parse the
+frontmatter to extract:
 
 - **`metadata.version`** — the per-skill version the user currently has (e.g., `1.0.0`)
 - **`metadata.source.repo_tag`** — the repo-wide release tag the skill was last synced from (e.g., `v2.3.0`)
+
+**Important:** These values come from the file the user has right now, not from
+`git log`, `git show HEAD:...`, or any commit. The file on disk may differ from
+what git history says — the file is the truth.
 
 If `repo_tag` is missing, treat the skill as unversioned — it needs a full
 comparison against upstream (skip to Phase 3 with worst-case assumptions).
@@ -232,23 +265,30 @@ failure mode tables, and user-facing messages.
 
 ### 1.5 Check if the skill actually changed
 
-A new repo tag does NOT mean every skill changed. Compare the skill's files
-between the user's `repo_tag` and the latest tag:
+A new repo tag does NOT mean every skill changed. Fetch the upstream skill
+content **from the remote** at both the user's `repo_tag` and the latest tag,
+then compare.
 
-**Git flow:**
+**Important:** Always fetch from the **remote**, not from local git objects.
+Local tags can be stale. Use `git show origin/<tag>:...` (with the `origin/`
+prefix) or fetch via `gh` API / raw URL — never `git show <tag>:...` alone.
+
+**Git flow (fetch from remote):**
 ```bash
+# Ensure remote tags are up to date
+git fetch origin --tags --force
+
+# Compare using remote-tracking refs
 git diff <user-repo-tag> <latest-tag> -- <metadata.source.path>/
 ```
 
-**`gh` / API flow:**
-Fetch the skill's files at both the user's `repo_tag` and the latest tag,
-then compare content:
+**`gh` / API flow (always fetches from remote):**
 ```bash
-# Fetch file listing at each tag
+# Fetch file listing at each tag from remote
 gh api repos/<owner>/<repo>/contents/<path>?ref=<user-repo-tag> --jq '.[].name'
 gh api repos/<owner>/<repo>/contents/<path>?ref=<latest-tag> --jq '.[].name'
 
-# Compare individual files
+# Fetch file content from remote
 gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<tag> --jq '.content' | base64 -d
 ```
 
@@ -260,8 +300,9 @@ checks skip these intermediate tags) but don't touch any skill content.
 
 If the skill's files **did change** between tags:
 
-1. **Read the upstream skill's `metadata.version`** from its SKILL.md at the
-   latest tag. This is the per-skill version the user will be updating to.
+1. **Read the upstream skill's `metadata.version`** from its SKILL.md fetched
+   from the remote at the latest tag. This is the per-skill version the user
+   will be updating to.
 2. Display the version context to the user:
    > Update available for `<skill-name>`: v`<local-version>` → v`<upstream-version>`
    > (repo tag: `<user-repo-tag>` → `<latest-tag>`)
@@ -347,32 +388,60 @@ the user has uncommitted changes.
 Determine what the user customized and what upstream changed.
 
 The goal is to compare three versions:
-- **Base**: the skill's content at the user's `metadata.source.repo_tag`
-  (what they originally installed or last updated from)
-- **Local**: what the user has now (base + their customizations)
-- **Upstream**: the skill's content at the latest repo tag
+- **Base**: the skill's content **fetched from the remote** at the user's
+  `metadata.source.repo_tag` (what they originally installed or last updated
+  from)
+- **Local**: the **actual files on disk** right now (base + their customizations)
+- **Upstream**: the skill's content **fetched from the remote** at the latest
+  repo tag
 
-### 3.1 Get the base version
+**Critical rule:** Local = file on disk. Base and Upstream = fetched from remote.
+Never use `git show <tag>:...` without the remote prefix — local tags can be
+stale. Never use `git log` or commit history to determine local state.
 
-**Git flow:**
-If the user's repo_tag is available locally:
+### 3.1 Get the base version (from remote)
+
+Fetch the skill's files **from the remote** at the user's `repo_tag` (read
+from the SKILL.md file on disk in Phase 1.3).
+
+**Git flow (remote-aware):**
 ```bash
-git show <metadata.source.repo_tag>:<metadata.source.path>/
+# Force-update local tags to match remote
+git fetch origin --tags --force
+
+# Now safe to use the tag — it matches remote after force-fetch
+git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md
 ```
 
-**`gh` / API flow:**
-Fetch the skill's files from upstream at the user's `repo_tag`:
+**`gh` / API flow (always remote):**
 ```bash
-gh api repos/<owner>/<repo>/contents/<path>?ref=<metadata.source.repo_tag> \
-  --jq '.[].name'
+gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<metadata.source.repo_tag> \
+  --jq '.content' | base64 -d
 ```
-Then fetch each file's content with `--jq '.content' | base64 -d`.
 
 If even this fails (e.g., tag was deleted, no network), treat every file as
 potentially edited by the user (worst case: full CONFLICT categorization,
 agent merges everything carefully).
 
-### 3.2 Categorize each file
+### 3.2 Get the local version (from disk)
+
+**Read the actual file on disk.** This is the user's current state — including
+any uncommitted edits, reverts, or manual changes. Do NOT use `git show HEAD:...`
+or any git command. Just read the file:
+
+```
+Read the file at: <skill-path>/SKILL.md
+```
+
+This is what the user actually sees and uses. This is the truth.
+
+### 3.3 Get the upstream version (from remote)
+
+Fetch the skill's files **from the remote** at the latest tag (found in
+Phase 1.4). Use the same method as 3.1 but with the latest tag instead of
+the user's `repo_tag`.
+
+### 3.4 Categorize each file
 
 Compare base→local (user's edits) and base→upstream (new changes).
 
@@ -565,10 +634,11 @@ Upstream update discarded.
 When the user runs `/skill-updater --check`:
 
 1. Scan all known skill locations (user-scope + project-scope, all AI tools).
-2. Classify each skill's origin (see 1.1).
-3. For skills with `metadata.source`, fetch the latest upstream tag. Group
-   skills from the same repo to avoid redundant API calls — one tag lookup
-   per repo, not per skill.
+2. **Read each SKILL.md file on disk** to get `metadata.version` and
+   `metadata.source.repo_tag`. The file is the truth — not git history.
+3. For skills with `metadata.source`, fetch the latest upstream tag **from the
+   remote**. Group skills from the same repo to avoid redundant API calls — one
+   tag lookup per repo, not per skill.
 4. If any fetches fail (auth, network), mark those skills as
    `Check failed: <reason>` and continue checking the rest. Don't let one
    failure block the entire check.
