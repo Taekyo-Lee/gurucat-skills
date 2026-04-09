@@ -49,3 +49,21 @@ into the main reference files.
 **Resolution:** Rewrite Phase 1 and Phase 3 instructions to enforce file-on-disk as primary source. For upstream content, always fetch from remote — never use `git show <local-tag>:...`.
 
 **Update needed:** SKILL.md Phase 1 (local version reading), Phase 3 (base version retrieval), and the overall design principle section.
+
+### 2026-04-09 — Skill-updater must compare local file vs upstream file, not just tags
+
+**Environment:** Samsung corporate, git available, `gh` not available
+
+**What happened:** Skill-updater ran `git diff v1.0.0 v1.1.0` between tags and saw almost no difference (trailing newline only). It concluded "nothing to merge" and only updated the metadata version. But the local file on disk was very different from the upstream v1.1.0 — missing Dark Mode section, missing variable font weight line. The skill-updater never compared the local file against the upstream file and missed all the real differences.
+
+**Root cause:** The skill-updater's Phase 1.5 relied on `git diff` between tags to decide whether an update was needed. If the tag diff was small, it assumed there was nothing to do. It never compared the actual local file against the upstream target. The Samsung repo's v1.0.0 tag happened to have v1.1.0 content (tag misconfiguration), but even with correct tags, the fundamental flaw remains: the tag diff tells you what changed in the repo, NOT what the local file is missing.
+
+**Key principle: The primary comparison is always local file vs upstream file.** Tags differing is the trigger for an update. The job is to sync the local file with the upstream target. `git diff` between tags is irrelevant — what matters is the difference between what the user has and what upstream offers.
+
+**Resolution:** Rewrote Phase 1.5 and Phase 3:
+- Phase 1.5 now fetches the upstream file and compares it against the local file on disk (not tag-vs-tag diff)
+- Phase 3 now starts with local-vs-upstream comparison as the primary step
+- Base version (three-way) is now optional context for classifying differences, not the driver
+- Added sanity check: if base version's `metadata.version` doesn't match expected, warn and fall back to two-way comparison
+
+**Update needed:** Applied to SKILL.md Phase 1.5 and Phase 3.
