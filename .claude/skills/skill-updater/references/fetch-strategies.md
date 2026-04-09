@@ -12,14 +12,24 @@ one fails.
 
 *Prerequisites:* `has_git`, `in_repo`, `has_remote` (pointing to source)
 
+First, find the remote whose URL matches `metadata.source.url`:
 ```bash
-git fetch origin --tags --force
+git remote -v
+# The remote name could be origin, internal, upstream, etc.
+```
+
+Then fetch tags from that remote:
+```bash
+git fetch <remote> --tags --force
 git tag --list "v*" --sort=-version:refname | head -1
 ```
 
 **Important:** Always use `--force` with `--tags`. Without it, local tags that
 already exist won't be updated even if the remote tag points to a different
 commit. Stale local tags cause wrong content to be used in the three-way merge.
+
+**Important:** Do NOT assume the remote is named `origin`. Check `git remote -v`
+and match the URL against `metadata.source.url` from the SKILL.md file on disk.
 
 *Success:* Returns the latest semver tag (e.g., `v2.5.0`).
 
