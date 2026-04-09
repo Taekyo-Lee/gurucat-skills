@@ -283,17 +283,27 @@ they're unhappy with the result.
 
 ### Pass criteria
 
-- [ ] brand-guidelines/SKILL.md is restored to pre-update state
-- [ ] Samsung Blue customization (`#1428a0`) is back
-- [ ] Dark Mode section is gone (it was from upstream)
-- [ ] `metadata.version` is back to `"1.0.0"`
-- [ ] `metadata.source.repo_tag` is back to `"v1.0.0"`
-- [ ] Revert commit exists in git log
-- [ ] File-based backup was used (not git branch)
+- [x] brand-guidelines/SKILL.md is restored to pre-update state
+- [x] Samsung Blue customization (`#1428a0`) is back
+- [x] Dark Mode section is gone (it was from upstream)
+- [x] `metadata.version` is back to `"1.0.0"`
+- [x] `metadata.source.repo_tag` is back to `"v1.0.0"`
+- [x] Revert commit exists in git log
+- [x] File-based backup was used (not git branch)
 
 ### Actual result
 
-> (to be filled after testing)
+> **PASS** (2026-04-09, Samsung corporate environment)
+>
+> All criteria met. Revert flow worked correctly: found backup, restored
+> with `cp -r`, committed the revert.
+>
+> **Known issue:** Natural language revert requests (e.g., "스킬 원상복구
+> 해줘") do NOT trigger the skill-updater skill automatically. The AI
+> handles the restore manually without loading the skill. Had to explicitly
+> say "skill-updater 스킬 사용해" to trigger the proper revert flow.
+> The skill description was refined but the trigger issue persists — this
+> is a platform-level limitation, not a skill design issue.
 
 ---
 
