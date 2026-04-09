@@ -390,8 +390,9 @@ know where to check for updates, so it must ask the user.
 
 ### Pre-conditions
 
-- Create or find a skill with no `metadata.source` in its frontmatter
-- (Can simulate by temporarily removing `metadata.source` from a skill)
+Use the `jupyter-notebook-rebooting` skill at `~/.claude/skills/jupyter-notebook-rebooting/`.
+This skill has no `metadata.source` block — it's a locally-written skill with
+only `name` and `description` in its frontmatter. No simulation needed.
 
 ### Invocation
 
@@ -411,15 +412,26 @@ know where to check for updates, so it must ask the user.
 
 ### Pass criteria
 
-- [ ] Detects missing `metadata.source`
-- [ ] Asks the user about the skill's origin
-- [ ] Handles "user-authored" response correctly (no update, no stamp)
-- [ ] Handles "from GitHub" response correctly (stamps and proceeds)
-- [ ] Does NOT crash or dead-end
+- [x] Detects missing `metadata.source`
+- [x] Asks the user about the skill's origin
+- [x] Handles "user-authored" response correctly (no update, no stamp)
+- [ ] Handles "from GitHub" response correctly (stamps and proceeds) — not tested
+- [x] Does NOT crash or dead-end
 
 ### Actual result
 
-> (to be filled after testing)
+> **PASS** (2026-04-09, Samsung corporate environment)
+>
+> Tested with a locally-created `email` skill (4 lines, no metadata.source).
+> The AI correctly:
+> - Detected missing `metadata.source`
+> - Asked the user where the skill came from (3 options in Korean)
+> - User said "I made it" → reported "nothing to update"
+> - Did not crash, did not attempt to stamp or modify the file
+>
+> Note: "from GitHub" stamping flow was not tested (would need a skill
+> that was copied from a repo without metadata). Tested the "user-authored"
+> path only.
 
 ---
 
