@@ -207,3 +207,48 @@ A two-way diff can't tell *who* made a change. If the user changed line 10 and
 upstream didn't, a two-way diff sees a difference but doesn't know whether to
 keep the user's version or take upstream's. The base version provides the
 reference point to answer "who changed this?"
+
+---
+
+## Source of Truth
+
+### Why does skill-updater read the file on disk instead of using git history?
+
+Because the file on disk is what the user actually has. Git history can be
+misleading:
+
+- The user may have reverted files without committing
+- Local git tags may be stale and point to wrong commits
+- Messy history (dummy commits, merges) can confuse tag-based lookups
+
+Example: the user runs skill-updater, gets a perfect merge, commits it. Then
+they revert the files (restore the old version) but don't commit. Now `git log`
+says "update already done" — but the file on disk is back to v1.0.0.
+Skill-updater must read the file, see `version: "1.0.0"`, and offer the update
+again.
+
+**The file is the truth. Git is just a reference.**
+
+### Where does each version come from in the three-way comparison?
+
+| Version | Source | Why |
+|---|---|---|
+| **Local** | The actual file on disk | This is what the user sees and uses |
+| **Base** | Fetched from the **remote** at the user's `repo_tag` | Local tags can be stale; remote is authoritative |
+| **Upstream** | Fetched from the **remote** at the latest tag | Same reason — always fetch from remote |
+
+Never use `git show <tag>:...` without ensuring the local tag matches the
+remote (use `git fetch --tags --force` first). Prefer `gh api` or raw URL
+downloads which always fetch from the remote.
+
+### What goes wrong if you trust local git tags?
+
+Local tags can become stale. For example:
+1. User clones the repo when it has tags v1.0.0 and v1.1.0
+2. The repo owner force-pushes a fix to the v1.1.0 tag (same tag name, different content)
+3. `git fetch --tags` (without `--force`) does NOT update the local v1.1.0 tag
+4. `git show v1.1.0:SKILL.md` returns the old, wrong content
+5. The entire three-way merge is based on wrong data
+
+This also happens when users have messy local history with extra commits and
+merges that shift what local tags resolve to.
