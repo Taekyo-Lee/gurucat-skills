@@ -3,6 +3,9 @@
 ## Test Environment
 
 - **Repo:** `Taekyo-Lee/my-skills` (https://github.com/Taekyo-Lee/my-skills)
+- **Remote:** local repo has `origin` pointing to the same URL as
+  `metadata.source.url` in the SKILL.md file on disk. This makes the skill
+  **Origin A** (git-cloned, full git flow available).
 - **Test skill:** `brand-guidelines` at `.claude/skills/brand-guidelines/`
 - **Tags on GitHub remote:**
   - `v1.0.0` — baseline release (brand-guidelines `metadata.version: "1.0.0"`)
