@@ -3,78 +3,87 @@
 ## Context
 
 We're building a `skill-updater` skill at `.claude/skills/skill-updater/`.
-The skill is **design-complete, tested at home, ready for real-world testing
-at Samsung (2026-04-09).**
+The skill is **design-complete with a critical fix applied after Samsung
+testing (2026-04-09).** Ready for re-testing.
 
-## Current state (end of 2026-04-08)
+## Current state (end of 2026-04-09)
 
 ### What's working
 
-- **SKILL.md** — core instructions (~600 lines) with 5-phase workflow, revert
-  flow, `--check` flow, self-evolution mechanism. Uses progressive disclosure
+- **SKILL.md** — core instructions with 5-phase workflow, revert flow,
+  `--check` flow, self-evolution mechanism. Uses progressive disclosure
   with 6 reference files.
 - **Two-level versioning** — `metadata.version` (per-skill) + `metadata.source.repo_tag`
-  (repo-wide). Both must be in YAML frontmatter. Skill-updater itself follows
-  this standard.
+  (repo-wide). Both must be in YAML frontmatter.
 - **Fetch chain** — 5 strategies: git → `gh` CLI → raw URL → local path → ask user.
   Each has documented failure modes and fallthrough triggers.
 - **Origin classification** — 6 types (A–F). Inline decision tree in SKILL.md,
   detailed stamping workflow in reference file.
-- **Self-evolution** — field-notes.md captures real-world failures. Already has
-  one entry from home testing (backup bug).
+- **Self-evolution** — field-notes.md captures real-world failures. Has two
+  entries: backup bug (2026-04-08) and source-of-truth bug (2026-04-09).
 
-### Test results (home, 2026-04-08)
+### Critical fix applied (2026-04-09)
 
-| Test | Result | Notes |
-|---|---|---|
-| Test 2: `--check` | **PASS** | Found both skills, correct status table, grouped API calls |
-| Test 1: Happy path | **PASS** | Samsung Blue preserved, Dark Mode + font weight added, metadata updated |
-| Test 3: `--revert` | **FAIL → FIXED** | Bug: git branch backup missed uncommitted changes. Fixed Phase 2 to use file-based backup first. Needs re-test. |
-| Test 4: No metadata | **Not run** | Interactive flow — run at Samsung tomorrow |
+**"The file on disk is the truth. Git history is just a reference."**
 
-### Bug found and fixed
+Samsung testing revealed that the skill was using local git tags and commit
+history as source of truth. This caused incorrect merges when local tags were
+stale or local history was messy (dummy commits, merge commits, reverts).
+
+**Root cause:** `git show v1.1.0:SKILL.md` reads from the local object store.
+If the local tag points to a wrong commit, the entire three-way comparison
+uses wrong data.
+
+**Fix applied across all files:**
+- SKILL.md — added "Fundamental Principle" section; rewrote Phase 1.3 (read
+  file on disk), Phase 1.5 (fetch from remote with `--tags --force`), Phase 3
+  (base from remote, local from disk, upstream from remote)
+- fetch-strategies.md — Strategy 1 now uses `--tags --force`
+- field-notes.md — full writeup of the bug and principle
+- TEST-PLAN.md — rewritten with principle baked in, added Test 5 (messy history)
+  and Test 6 (idempotency)
+
+### Previous fix (2026-04-08)
 
 **Phase 2 backup bug:** `git branch` only captures committed state, not the
 working tree. When user customizations are uncommitted, the backup branch
 misses them. Fix: always do `cp -r` file backup first (captures working tree),
-git branch is secondary. Revert flow updated to prefer file-based backup.
-Logged in `references/field-notes.md`.
+git branch is secondary. Logged in `references/field-notes.md`.
 
-### Test environment
+### Samsung testing observations (2026-04-09)
 
-- **Repo:** `Taekyo-Lee/my-skills` (https://github.com/Taekyo-Lee/my-skills)
-- **Test skill:** `brand-guidelines` with tags `v1.0.0` and `v1.1.0`
-- **v1.1.0 upstream changes:** Dark Mode section, variable font weight line
-- **User customization:** Blue accent `#6a9bcc` → `#1428a0` (Samsung Blue)
-- **Current local state:** brand-guidelines is at merged v1.1.0 with Samsung Blue preserved
+- `--check` works reliably (read-only, simple flow)
+- Happy path update is not yet robust — sometimes metadata.version not updated,
+  sometimes merge misses content
+- AI agent sometimes misreads its own tool output (thought `git show` results
+  were swapped when they weren't — got lucky with the "correction")
+- All issues traced back to using local git objects instead of remote + file
 
 ## What needs to happen next
 
-### 1. Re-test `--revert` with fixed Phase 2
+### 1. Re-test everything with the fix
 
-The backup logic was fixed but not re-tested. Need a fresh scenario:
-- Reset brand-guidelines to v1.0.0 with Samsung Blue customization (uncommitted)
-- Run `/skill-updater brand-guidelines` (should now do file-based backup)
-- Run `/skill-updater --revert brand-guidelines` (should restore from file backup)
-- Verify Samsung Blue is back
+All previous test results are discarded. The TEST-PLAN.md has been rewritten
+with 6 tests, all results blank. Test at Samsung corporate environment.
 
-### 2. Test 4: No metadata / origin classification
+**Test execution order:**
+1. Test 2 (`--check`) — read-only, lowest risk
+2. Test 1 (happy path) — full workflow with the fix
+3. Test 6 (re-run after update) — idempotency
+4. Test 3 (`--revert`) — undo
+5. Test 5 (messy history) — the scenario that found the bug
+6. Test 4 (no metadata) — interactive stamping
 
-Run `/skill-updater` against a skill with no `metadata.source`. Test the
-interactive stamping workflow. Can be done at Samsung with a real skill that
-a coworker shared.
+### 2. Samsung corporate edge cases
 
-### 3. Real-world testing at Samsung (2026-04-09)
+| Scenario | Expected |
+|---|---|
+| Corporate proxy | Fall through to local path |
+| No `gh` CLI | Skip Strategy 2 silently |
+| No PAT | Accept gracefully, offer local path |
+| VPN-only | Timeout handling, fall through |
 
-Samsung has strict security policies. Expected failure areas:
-- Corporate proxy blocking GitHub
-- `gh` CLI not installable (no admin rights)
-- PAT restrictions / SSO/SAML
-- VPN-only network
-
-Each failure → log in field-notes.md → fix skill → self-evolution loop.
-
-### 4. Open design questions (lower priority)
+### 3. Open design questions (lower priority)
 
 - Should skill-updater update ITSELF? (meta-update problem)
 - CHANGELOG.md handling during merges
@@ -83,11 +92,13 @@ Each failure → log in field-notes.md → fix skill → self-evolution loop.
 ## Files to read
 
 1. `.claude/skills/skill-updater/SKILL.md` — core workflow
-2. `.claude/skills/skill-updater/tests/TEST-PLAN.md` — test scenarios and results
+2. `.claude/skills/skill-updater/tests/TEST-PLAN.md` — test scenarios (results pending)
 3. `.claude/skills/skill-updater/references/field-notes.md` — real-world failures log
-4. `.claude/skills/skill-updater/references/origin-classification.md` — origin types
-5. `.claude/skills/skill-updater/references/environment-detection.md` — capability checks
-6. `.claude/skills/skill-updater/references/fetch-strategies.md` — per-strategy details
+4. `.claude/skills/skill-updater/references/fetch-strategies.md` — per-strategy details
+5. `.claude/skills/skill-updater/references/origin-classification.md` — origin types
+6. `.claude/skills/skill-updater/references/environment-detection.md` — capability checks
 7. `.claude/skills/skill-updater/references/error-handling.md` — error → action tables
 8. `.claude/skills/skill-updater/references/resolution-strategies.md` — merge conflict patterns
-9. `.claude/skills/skill-updater/scripts/check-versions.sh` — version comparison script
+9. `.claude/skills/skill-updater/docs/qna.md` — concepts and terminology for humans
+10. `.claude/skills/skill-updater/docs/api-reference.md` — command usage reference
+11. `.claude/skills/skill-updater/scripts/check-versions.sh` — version comparison script
