@@ -356,16 +356,27 @@ It should NOT:
 
 ### Pass criteria
 
-- [ ] Skill-updater reads the file on disk, not git history
-- [ ] Offers update despite git log showing a previous update commit
-- [ ] Fetches base/upstream from remote (uses `--tags --force`)
-- [ ] Produces correct merge result
-- [ ] `metadata.version` is `"1.1.0"` after merge
-- [ ] Samsung Blue preserved
+- [x] Skill-updater reads the file on disk, not git history
+- [x] Offers update despite git log showing a previous update commit
+- [x] Fetches base/upstream from remote (uses `--tags --force`)
+- [x] Produces correct merge result
+- [x] `metadata.version` is `"1.1.0"` after merge
+- [x] Samsung Blue preserved
 
 ### Actual result
 
-> (to be filled after testing)
+> **PASS** (2026-04-09, Samsung corporate environment)
+>
+> All criteria met. Git log showed multiple update/revert cycles and
+> dummy commits ("tttttt", "fdafsdfsdafsa", "123"), but the AI:
+> - Read the file on disk (v1.0.0), not git history
+> - Offered the update despite git log showing previous update commits
+> - Used `git fetch --tags --force` and `diff -u` with temp files
+> - Correctly applied Dark Mode, variable font weights, Samsung Blue
+>
+> The AI spent extra thinking time analyzing the confusing base version
+> (v1.0.0 tag on remote had v1.1.0 content), but correctly fell back to
+> local-vs-upstream comparison as the primary driver.
 
 ---
 
