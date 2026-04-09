@@ -19,6 +19,17 @@ edits (Samsung Blue) on v1.0.0, while upstream has moved to v1.1.0 with new
 content. The updater must pull in the new content without losing the user's
 customization.
 
+### Key principle under test
+
+**The file on disk is the truth. Git history is just a reference.**
+
+- Local state = the actual SKILL.md file on disk (not `git show HEAD:...`)
+- Base version = fetched from the **remote** (not local git tags)
+- Upstream version = fetched from the **remote** (not local git tags)
+
+The tests below verify that skill-updater works correctly regardless of
+messy local git history (dummy commits, merges, reverts).
+
 ---
 
 ## Test 1: Happy Path Update (Everything Goes Right)
@@ -32,7 +43,7 @@ important test — it exercises every phase of the skill.
 
 ### Pre-conditions
 
-- `brand-guidelines/SKILL.md` is local with:
+- `brand-guidelines/SKILL.md` file on disk has:
   - `metadata.version: "1.0.0"`
   - `metadata.source.repo_tag: "v1.0.0"`
   - User customization: Samsung Blue (`#1428a0`)
@@ -49,11 +60,13 @@ important test — it exercises every phase of the skill.
 
 1. **Phase 1 — Pre-flight:**
    - Locates skill at `.claude/skills/brand-guidelines/`
+   - **Reads the SKILL.md file on disk** (not git history)
    - Classifies as **Origin A** (git-cloned, remote matches source URL)
-   - Reads `metadata.version: "1.0.0"`, `repo_tag: "v1.0.0"`
-   - Fetches tags via git, finds `v1.1.0` as latest
-   - Diffs skill files between `v1.0.0` and `v1.1.0` — detects changes
-   - Reads upstream `metadata.version: "1.1.0"` from v1.1.0 tag
+   - Reads `metadata.version: "1.0.0"`, `repo_tag: "v1.0.0"` from the file
+   - Fetches tags from remote via `git fetch --tags --force`
+   - Finds `v1.1.0` as latest tag
+   - Fetches upstream SKILL.md **from the remote** at v1.1.0 tag
+   - Reads upstream `metadata.version: "1.1.0"`
    - Displays: "Update available: v1.0.0 → v1.1.0 (repo tag: v1.0.0 → v1.1.0)"
 
 2. **Phase 1.7 — Confirm with user:**
@@ -62,11 +75,12 @@ important test — it exercises every phase of the skill.
 
 3. **Phase 2 — Backup:**
    - Creates file-based backup (`cp -r`) to capture working-tree state
-   - Also creates backup branch: `pre-update-brand-guidelines-20260408`
+   - Also creates backup branch: `pre-update-brand-guidelines-YYYYMMDD`
 
 4. **Phase 3 — Detect changes (three-way comparison):**
-   - Gets base version (v1.0.0 content from git tag)
-   - Compares base vs. local (user's edits) and base vs. upstream (v1.1.0)
+   - Gets base version **from the remote** at v1.0.0 tag
+   - Reads local version **from the file on disk**
+   - Gets upstream version **from the remote** at v1.1.0 tag
    - Categorizes each change by section within SKILL.md:
      - Dark Mode section: **CLEAN** — only upstream added it, user didn't
        touch this area
@@ -98,29 +112,14 @@ important test — it exercises every phase of the skill.
 - [ ] `metadata.version` is `"1.1.0"`
 - [ ] `metadata.source.repo_tag` is `"v1.1.0"`
 - [ ] `metadata.source.updated_at` is today's date
-- [ ] Backup branch exists
+- [ ] File-based backup exists
 - [ ] User was asked to confirm before changes were applied
 - [ ] Final report clearly shows what changed and what was preserved
+- [ ] Base and upstream were fetched from the remote (not local git tags)
 
 ### Actual result
 
-> **PASS** (2026-04-08)
->
-> All criteria met:
-> - [x] Samsung Blue (`#1428a0`) preserved in merged file
-> - [x] Dark Mode section present
-> - [x] Variable font weight line present in Font Management
-> - [x] `metadata.version` is `"1.1.0"`
-> - [x] `metadata.source.repo_tag` is `"v1.1.0"`
-> - [x] `metadata.source.updated_at` is `"2026-04-08"`
-> - [x] Backup branch `pre-update-brand-guidelines-20260408` exists
-> - [x] User was asked to confirm before changes were applied
-> - [x] Final report clearly shows changes applied and customizations preserved
->
-> Note: All changes categorized correctly — user edits (Samsung Blue,
-> metadata.source) were USER-ONLY, upstream additions (Dark Mode, variable
-> font, version bump) were CLEAN. No CONFLICT files. Three-way merge
-> worked as designed.
+> (to be filled after testing)
 
 ---
 
@@ -128,9 +127,10 @@ important test — it exercises every phase of the skill.
 
 ### What it tests
 
-The `--check` flow: scanning all skills, classifying their origins,
-fetching upstream tags, and displaying a status table. This is read-only —
-it reports what updates are available but changes nothing.
+The `--check` flow: scanning all skills, reading their SKILL.md files on disk,
+classifying their origins, fetching upstream tags from the remote, and displaying
+a status table. This is read-only — it reports what updates are available but
+changes nothing.
 
 ### Pre-conditions
 
@@ -147,17 +147,17 @@ it reports what updates are available but changes nothing.
 ### Expected workflow
 
 1. Scans all known skill locations (user-scope + project-scope)
-2. Finds `brand-guidelines` and `skill-updater` (and possibly others)
+2. **Reads each SKILL.md file on disk** to get version and repo_tag
 3. Classifies each skill's origin
-4. For skills with `metadata.source`, fetches latest repo tag
+4. For skills with `metadata.source`, fetches latest repo tag from the remote
 5. Groups skills from the same repo to avoid redundant API calls
 6. Displays a status table showing version, repo tag, and status
 
 ### Pass criteria
 
 - [ ] Finds both `brand-guidelines` and `skill-updater`
-- [ ] Shows correct `metadata.version` for each
-- [ ] Shows correct `metadata.source.repo_tag` for each
+- [ ] Shows correct `metadata.version` for each (read from file on disk)
+- [ ] Shows correct `metadata.source.repo_tag` for each (read from file on disk)
 - [ ] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
 - [ ] skill-updater shows "Up to date" (its files didn't change between repo tags v1.0.0 and v1.1.0)
 - [ ] Skills without `metadata.source` show appropriate status
@@ -165,19 +165,7 @@ it reports what updates are available but changes nothing.
 
 ### Actual result
 
-> **PASS** (2026-04-08)
->
-> All criteria met:
-> - [x] Found both `brand-guidelines` and `skill-updater`
-> - [x] Correct `metadata.version` for each (1.0.0)
-> - [x] Correct `metadata.source.repo_tag` for each (v1.0.0)
-> - [x] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
-> - [x] skill-updater shows "Up to date" (its files didn't change between repo tags)
-> - [x] Table is readable and well-formatted
-> - [x] Grouped API calls — one tag fetch for the shared repo
->
-> Note: skill-updater correctly identified that despite a new repo tag
-> (v1.1.0), the skill-updater files didn't change between tags.
+> (to be filled after testing)
 
 ---
 
@@ -192,7 +180,7 @@ they're unhappy with the result.
 ### Pre-conditions
 
 - Test 1 has been completed successfully (brand-guidelines was updated)
-- Backup branch `pre-update-brand-guidelines-*` exists
+- File-based backup `brand-guidelines.backup-*` exists
 - brand-guidelines is currently at v1.1.0 (post-update merged state)
 
 ### Invocation
@@ -203,41 +191,24 @@ they're unhappy with the result.
 
 ### Expected workflow
 
-1. Finds the most recent backup branch for brand-guidelines
-2. Restores skill folder from that branch
+1. Finds the most recent file-based backup for brand-guidelines
+2. Restores skill folder from the file backup (preferred over git branch)
 3. Commits the revert
 4. Reports: "Reverted brand-guidelines to your pre-update version"
 
 ### Pass criteria
 
 - [ ] brand-guidelines/SKILL.md is restored to pre-update state
-- [ ] Samsung Blue customization is back
+- [ ] Samsung Blue customization (`#1428a0`) is back
 - [ ] Dark Mode section is gone (it was from upstream)
 - [ ] `metadata.version` is back to `"1.0.0"`
 - [ ] `metadata.source.repo_tag` is back to `"v1.0.0"`
 - [ ] Revert commit exists in git log
+- [ ] File-based backup was used (not git branch)
 
 ### Actual result
 
-> **FAIL → BUG FOUND → FIXED** (2026-04-08)
->
-> The revert restored the wrong state. The backup branch contained the
-> committed v1.0.0 upstream content (without Samsung Blue), not the user's
-> actual pre-update state on disk (v1.0.0 + Samsung Blue customization).
->
-> **Root cause:** `git branch` only captures committed state, not the
-> working tree. The user's Samsung Blue customization was an uncommitted
-> edit, so the backup branch missed it entirely.
->
-> **Fix applied:** Rewrote Phase 2 backup to always do a file-based backup
-> (`cp -r`) first, which captures the working tree. Git branch backup is
-> now secondary. Also rewrote revert flow to prefer file-based backup.
-> Logged in `references/field-notes.md`.
->
-> **Self-evolution mechanism worked** — bug discovered during testing,
-> logged, and promoted into a skill update in one pass.
->
-> - [ ] Re-test after fix (needs fresh test scenario)
+> (to be filled after testing)
 
 ---
 
@@ -263,7 +234,7 @@ know where to check for updates, so it must ask the user.
 ### Expected workflow
 
 1. Locates the skill
-2. Reads frontmatter — no `metadata.source` found
+2. **Reads the SKILL.md file on disk** — no `metadata.source` found
 3. Triggers the interactive stamping workflow
 4. Asks user where the skill came from (6 options)
 5. Based on answer:
@@ -284,40 +255,88 @@ know where to check for updates, so it must ask the user.
 
 ---
 
-## Test 3b: Re-test `--revert` with Fixed Backup
+## Test 5: Messy Local History (Robustness Test)
 
 ### What it tests
 
-Re-run of Test 3 after the backup bug fix. Verifies that the new file-based
-backup (`cp -r`) correctly captures the full working-tree state — including
-uncommitted user customizations that the old git-branch backup missed.
+Verifies that skill-updater works correctly even when the local git history is
+messy — dummy commits, merge commits, reverts, stale local tags. This is the
+scenario that exposed the "file on disk is the truth" principle.
 
 ### Pre-conditions
 
-Reset brand-guidelines to a state that simulates a user at v1.0.0 with
-uncommitted customizations:
-```
-1. Restore brand-guidelines/SKILL.md to v1.0.0 base content
-2. Add metadata.source block (pointing to Taekyo-Lee/my-skills, repo_tag v1.0.0)
-3. Change Blue accent to Samsung Blue (#1428a0)
-4. Do NOT commit these changes — they must be uncommitted
-```
+Set up a deliberately messy local state:
+1. Start with brand-guidelines at v1.0.0 with Samsung Blue customization
+2. Make several dummy commits (meaningless changes like adding spaces)
+3. Run skill-updater once (partial or full merge)
+4. Revert the files manually (restore pre-update content) without committing
+5. Make another dummy commit on something else
+
+Now the local state is: git log shows a previous skill-updater commit, but the
+file on disk is back to v1.0.0 with Samsung Blue.
 
 ### Invocation
 
 ```
-/skill-updater brand-guidelines        # should create file-based backup
-/skill-updater --revert brand-guidelines  # should restore from file backup
+/skill-updater brand-guidelines
 ```
+
+### Expected behavior
+
+Skill-updater should:
+1. **Read the SKILL.md file on disk** and see `version: "1.0.0"`
+2. Offer the update (v1.0.0 → v1.1.0) — ignoring git history
+3. Fetch base and upstream **from the remote** (not stale local tags)
+4. Perform the merge correctly
+
+It should NOT:
+- Say "already up to date" based on git log
+- Use stale local tag content for the three-way comparison
+- Be confused by the messy commit history
 
 ### Pass criteria
 
-- [ ] File-based backup `brand-guidelines.backup-*` is created before update
-- [ ] The backup contains the user's uncommitted state (Samsung Blue + metadata.source)
-- [ ] After revert, Samsung Blue (`#1428a0`) is restored
-- [ ] After revert, `metadata.source` block is restored
-- [ ] After revert, Dark Mode section is gone
-- [ ] After revert, `metadata.version` is `"1.0.0"`
+- [ ] Skill-updater reads the file on disk, not git history
+- [ ] Offers update despite git log showing a previous update commit
+- [ ] Fetches base/upstream from remote (uses `--tags --force`)
+- [ ] Produces correct merge result
+- [ ] `metadata.version` is `"1.1.0"` after merge
+- [ ] Samsung Blue preserved
+
+### Actual result
+
+> (to be filled after testing)
+
+---
+
+## Test 6: Re-run After Successful Update (Idempotency)
+
+### What it tests
+
+Verifies that running skill-updater again after a successful update correctly
+reports "up to date" — by reading the file on disk, not git history.
+
+### Pre-conditions
+
+- Test 1 completed successfully
+- brand-guidelines SKILL.md on disk has `version: "1.1.0"`, `repo_tag: "v1.1.0"`
+
+### Invocation
+
+```
+/skill-updater brand-guidelines
+```
+
+### Expected behavior
+
+Skill-updater reads the file, sees `repo_tag: "v1.1.0"`, fetches tags from
+remote, finds `v1.1.0` is the latest → reports "up to date."
+
+### Pass criteria
+
+- [ ] Reads version info from the file on disk
+- [ ] Correctly reports "up to date"
+- [ ] Does NOT attempt to re-merge or modify files
 
 ### Actual result
 
@@ -327,19 +346,18 @@ uncommitted customizations:
 
 ## Test Execution Order
 
-**Round 1 — Home environment (2026-04-08) — completed:**
-1. **Test 2** (`--check` scan) — PASS
-2. **Test 1** (happy path update) — PASS
-3. **Test 3** (`--revert`) — FAIL → backup bug found → fixed in code
-
-**Round 2 — Samsung corporate environment (2026-04-09):**
-1. **Test 3b** (re-test `--revert` with fixed backup logic) — first priority
-2. **Test 4** (no metadata / interactive origin classification)
-3. Samsung-specific edge cases (proxy, no `gh`, auth failures)
+**At Samsung corporate environment:**
+1. **Test 2** (`--check` scan) — read-only, lowest risk
+2. **Test 1** (happy path update) — full workflow
+3. **Test 6** (re-run after update) — idempotency check
+4. **Test 3** (`--revert`) — undo the update
+5. **Test 5** (messy history) — robustness after revert + dummy commits
+6. **Test 4** (no metadata) — interactive stamping
+7. Samsung-specific edge cases (proxy, no `gh`, auth failures)
 
 ---
 
-## Future Tests (Samsung Corporate Environment — 2026-04-09)
+## Future Tests (Samsung Corporate Environment)
 
 These tests will be conducted at Samsung Electronics where strict security
 policies apply. Expected failure areas:
