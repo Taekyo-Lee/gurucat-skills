@@ -13,9 +13,13 @@ one fails.
 *Prerequisites:* `has_git`, `in_repo`, `has_remote` (pointing to source)
 
 ```bash
-git fetch origin --tags
+git fetch origin --tags --force
 git tag --list "v*" --sort=-version:refname | head -1
 ```
+
+**Important:** Always use `--force` with `--tags`. Without it, local tags that
+already exist won't be updated even if the remote tag points to a different
+commit. Stale local tags cause wrong content to be used in the three-way merge.
 
 *Success:* Returns the latest semver tag (e.g., `v2.5.0`).
 
