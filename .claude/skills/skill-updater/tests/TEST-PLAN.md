@@ -321,15 +321,19 @@ scenario that exposed the "file on disk is the truth" principle.
 
 ### Pre-conditions
 
-Set up a deliberately messy local state:
-1. Start with brand-guidelines at v1.0.0 with Samsung Blue customization
-2. Make several dummy commits (meaningless changes like adding spaces)
-3. Run skill-updater once (partial or full merge)
-4. Revert the files manually (restore pre-update content) without committing
-5. Make another dummy commit on something else
+This test requires Tests 1-4 to have been run first. After those tests,
+the local repo naturally has a messy git history:
 
-Now the local state is: git log shows a previous skill-updater commit, but the
-file on disk is back to v1.0.0 with Samsung Blue.
+- Multiple skill-updater update and revert commits
+- Possibly dummy commits from earlier testing
+- Local tags may have been deleted and re-fetched
+
+The key condition: **brand-guidelines/SKILL.md on disk has `version: "1.0.0"`
+and `repo_tag: "v1.0.0"`** (restored by Test 4), but `git log` shows previous
+update commits (from Test 2) that say "update brand-guidelines v1.0.0 → v1.1.0".
+
+This creates a contradiction: the file says v1.0.0, but git history says
+the update already happened. Skill-updater must trust the file, not git history.
 
 ### Invocation
 
