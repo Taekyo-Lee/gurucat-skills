@@ -4,25 +4,31 @@
 
 - **Repo:** `Taekyo-Lee/my-skills` (https://github.com/Taekyo-Lee/my-skills)
 - **Test skill:** `brand-guidelines` at `.claude/skills/brand-guidelines/`
-- **Tags on remote:**
-  - `v1.0.0` — baseline (brand-guidelines `metadata.version: "1.0.0"`)
-  - `v1.1.0` — upstream update (brand-guidelines `metadata.version: "1.1.0"`)
-- **v1.1.0 changes from v1.0.0:**
+- **Tags on GitHub remote:**
+  - `v1.0.0` — baseline release (brand-guidelines `metadata.version: "1.0.0"`)
+  - `v1.1.0` — added Dark Mode section, variable font weight line (brand-guidelines `metadata.version: "1.1.0"`)
+- **Upstream changes in v1.1.0 (compared to v1.0.0):**
   - Added new "Dark Mode" section (between Colors and Typography)
   - Added variable font weight line to Font Management section
   - Bumped `metadata.version` from `"1.0.0"` to `"1.1.0"`
-- **Local user customization:**
+- **Local user customization (uncommitted edits on top of v1.0.0 baseline):**
   - Blue accent color changed from `#6a9bcc` to `#1428a0` (Samsung Blue)
+
+This setup creates a realistic three-way merge scenario: the user has local
+edits (Samsung Blue) on v1.0.0, while upstream has moved to v1.1.0 with new
+content. The updater must pull in the new content without losing the user's
+customization.
 
 ---
 
-## Test 1: Happy Path Update
+## Test 1: Happy Path Update (Everything Goes Right)
 
 ### What it tests
 
-The full 5-phase workflow: pre-flight → backup → detect changes → apply
-update → verify & report. This is the most important test — it exercises
-every phase of the skill.
+The full 5-phase workflow end-to-end: pre-flight → backup → detect changes →
+apply update → verify & report. "Happy path" means the ideal scenario where
+all tools work, the network is available, and no errors occur. This is the most
+important test — it exercises every phase of the skill.
 
 ### Pre-conditions
 
@@ -55,22 +61,26 @@ every phase of the skill.
    - Asks user to confirm before proceeding
 
 3. **Phase 2 — Backup:**
-   - Creates backup branch: `pre-update-brand-guidelines-20260408`
+   - Creates file-based backup (`cp -r`) to capture working-tree state
+   - Also creates backup branch: `pre-update-brand-guidelines-20260408`
 
-4. **Phase 3 — Detect changes:**
-   - Gets base version (v1.0.0 content from git)
-   - Categorizes files:
-     - SKILL.md → **CONFLICT** (user changed Blue color; upstream added
-       Dark Mode section and Font Management line)
+4. **Phase 3 — Detect changes (three-way comparison):**
+   - Gets base version (v1.0.0 content from git tag)
+   - Compares base vs. local (user's edits) and base vs. upstream (v1.1.0)
+   - Categorizes each change by section within SKILL.md:
+     - Dark Mode section: **CLEAN** — only upstream added it, user didn't
+       touch this area
+     - Font Management line: **CLEAN** — only upstream added it
+     - Blue accent color: **USER-ONLY** — only user changed it (upstream
+       still has `#6a9bcc`)
+     - `metadata.version`: **CLEAN** — only upstream bumped it
 
-5. **Phase 4 — Apply update:**
-   - Dark Mode section: **CLEAN** — new section, no overlap with user edits.
-     Add it between Colors and Typography.
-   - Font Management variable font line: **CLEAN** — user didn't edit this
-     section. Add the line.
-   - Blue accent color: **CONFLICT** — upstream has `#6a9bcc`, user has
-     `#1428a0`. Preserve Samsung Blue.
-   - `metadata.version`: Update to `"1.1.0"`
+5. **Phase 4 — Apply update (merge based on categories):**
+   - Dark Mode section: CLEAN → accept upstream. Add between Colors and
+     Typography.
+   - Font Management variable font line: CLEAN → accept upstream. Add the line.
+   - Blue accent color: USER-ONLY → keep user's Samsung Blue (`#1428a0`).
+   - `metadata.version`: CLEAN → accept upstream `"1.1.0"`
    - `metadata.source.repo_tag`: Update to `"v1.1.0"`
    - `metadata.source.updated_at`: Update to today's date
 
@@ -114,17 +124,18 @@ every phase of the skill.
 
 ---
 
-## Test 2: `--check` Scan
+## Test 2: `--check` Scan (Read-Only Status Report)
 
 ### What it tests
 
-The `--check` flow: scanning all skill locations, classifying origins,
-fetching upstream tags, and displaying a status table.
+The `--check` flow: scanning all skills, classifying their origins,
+fetching upstream tags, and displaying a status table. This is read-only —
+it reports what updates are available but changes nothing.
 
 ### Pre-conditions
 
-- `brand-guidelines` has `metadata.source` (Origin A/B)
-- `skill-updater` has `metadata.source` (Origin A/B)
+- `brand-guidelines` has `metadata.source` with a known upstream repo
+- `skill-updater` has `metadata.source` with the same upstream repo
 - Other skills in the environment may or may not have `metadata.source`
 
 ### Invocation
@@ -148,7 +159,7 @@ fetching upstream tags, and displaying a status table.
 - [ ] Shows correct `metadata.version` for each
 - [ ] Shows correct `metadata.source.repo_tag` for each
 - [ ] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
-- [ ] skill-updater shows "Up to date" (no changes between v1.0.0 and v1.1.0)
+- [ ] skill-updater shows "Up to date" (its files didn't change between repo tags v1.0.0 and v1.1.0)
 - [ ] Skills without `metadata.source` show appropriate status
 - [ ] Table is readable and well-formatted
 
@@ -161,7 +172,7 @@ fetching upstream tags, and displaying a status table.
 > - [x] Correct `metadata.version` for each (1.0.0)
 > - [x] Correct `metadata.source.repo_tag` for each (v1.0.0)
 > - [x] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
-> - [x] skill-updater shows "Up to date" (no changes between tags)
+> - [x] skill-updater shows "Up to date" (its files didn't change between repo tags)
 > - [x] Table is readable and well-formatted
 > - [x] Grouped API calls — one tag fetch for the shared repo
 >
@@ -170,18 +181,19 @@ fetching upstream tags, and displaying a status table.
 
 ---
 
-## Test 3: `--revert` After Update
+## Test 3: `--revert` After Update (Undo an Update)
 
 ### What it tests
 
 The revert flow: restoring the skill to its pre-update state from the backup
-branch created in Test 1.
+created in Test 1. This tests whether the user can safely undo an update if
+they're unhappy with the result.
 
 ### Pre-conditions
 
-- Test 1 has been completed successfully
+- Test 1 has been completed successfully (brand-guidelines was updated)
 - Backup branch `pre-update-brand-guidelines-*` exists
-- brand-guidelines is at v1.1.0 (merged state)
+- brand-guidelines is currently at v1.1.0 (post-update merged state)
 
 ### Invocation
 
@@ -209,13 +221,13 @@ branch created in Test 1.
 
 > **FAIL → BUG FOUND → FIXED** (2026-04-08)
 >
-> The revert restored the wrong state. Backup branch had the committed
-> v1.1.0 upstream content, not the user's pre-update working-tree state
-> (which had Samsung Blue + metadata.source as uncommitted changes).
+> The revert restored the wrong state. The backup branch contained the
+> committed v1.0.0 upstream content (without Samsung Blue), not the user's
+> actual pre-update state on disk (v1.0.0 + Samsung Blue customization).
 >
-> **Root cause:** `git branch` captures committed state, not working tree.
-> The user's customizations were uncommitted, so the backup branch missed
-> them entirely.
+> **Root cause:** `git branch` only captures committed state, not the
+> working tree. The user's Samsung Blue customization was an uncommitted
+> edit, so the backup branch missed it entirely.
 >
 > **Fix applied:** Rewrote Phase 2 backup to always do a file-based backup
 > (`cp -r`) first, which captures the working tree. Git branch backup is
@@ -229,12 +241,13 @@ branch created in Test 1.
 
 ---
 
-## Test 4: No Metadata (Origin Classification)
+## Test 4: No Metadata (What Happens When Origin is Unknown)
 
 ### What it tests
 
-The origin classification and stamping workflow when a skill has no
-`metadata.source` block.
+The origin classification and interactive stamping workflow when a skill has
+no `metadata.source` block. Without source metadata, skill-updater doesn't
+know where to check for updates, so it must ask the user.
 
 ### Pre-conditions
 
@@ -271,12 +284,13 @@ The origin classification and stamping workflow when a skill has no
 
 ---
 
-## Test 3b: Re-test `--revert` with Fixed Backup (2026-04-09)
+## Test 3b: Re-test `--revert` with Fixed Backup
 
 ### What it tests
 
-Verifies the Phase 2 backup fix works: file-based backup (`cp -r`) captures
-the full working-tree state including uncommitted user customizations.
+Re-run of Test 3 after the backup bug fix. Verifies that the new file-based
+backup (`cp -r`) correctly captures the full working-tree state — including
+uncommitted user customizations that the old git-branch backup missed.
 
 ### Pre-conditions
 
@@ -313,15 +327,15 @@ uncommitted customizations:
 
 ## Test Execution Order
 
-**Home tests (2026-04-08) — completed:**
-1. **Test 2** (`--check`) — PASS
+**Round 1 — Home environment (2026-04-08) — completed:**
+1. **Test 2** (`--check` scan) — PASS
 2. **Test 1** (happy path update) — PASS
-3. **Test 3** (`--revert`) — FAIL → bug found → fixed
+3. **Test 3** (`--revert`) — FAIL → backup bug found → fixed in code
 
-**Samsung tests (2026-04-09):**
-1. **Test 3b** (re-test `--revert` with fixed backup) — first priority
-2. **Test 4** (no metadata / origin classification)
-3. Samsung-specific edge cases (proxy, no gh, auth failures)
+**Round 2 — Samsung corporate environment (2026-04-09):**
+1. **Test 3b** (re-test `--revert` with fixed backup logic) — first priority
+2. **Test 4** (no metadata / interactive origin classification)
+3. Samsung-specific edge cases (proxy, no `gh`, auth failures)
 
 ---
 
