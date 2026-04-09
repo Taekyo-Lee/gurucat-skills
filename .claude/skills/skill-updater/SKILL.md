@@ -270,13 +270,18 @@ content **from the remote** at both the user's `repo_tag` and the latest tag,
 then compare.
 
 **Important:** Always fetch from the **remote**, not from local git objects.
-Local tags can be stale. Use `git show origin/<tag>:...` (with the `origin/`
-prefix) or fetch via `gh` API / raw URL — never `git show <tag>:...` alone.
+Local tags can be stale. The remote name may not be `origin` — find the remote
+whose URL matches `metadata.source.url` by checking `git remote -v`, then use
+that remote name in all git commands.
 
 **Git flow (fetch from remote):**
 ```bash
+# Find the remote whose URL matches metadata.source.url
+git remote -v
+# Use the matching remote name (could be origin, internal, upstream, etc.)
+
 # Ensure remote tags are up to date
-git fetch origin --tags --force
+git fetch <remote> --tags --force
 
 # Compare using remote-tracking refs
 git diff <user-repo-tag> <latest-tag> -- <metadata.source.path>/
@@ -406,8 +411,12 @@ from the SKILL.md file on disk in Phase 1.3).
 
 **Git flow (remote-aware):**
 ```bash
+# Find the remote whose URL matches metadata.source.url
+# (could be origin, internal, upstream, etc.)
+git remote -v
+
 # Force-update local tags to match remote
-git fetch origin --tags --force
+git fetch <remote> --tags --force
 
 # Now safe to use the tag — it matches remote after force-fetch
 git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md
