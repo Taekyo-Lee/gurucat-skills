@@ -285,32 +285,41 @@ git remote -v
 git fetch <remote> --tags --force
 ```
 
-**Step 2: Fetch the upstream SKILL.md from the remote at the latest tag:**
+**Step 2: Save the upstream SKILL.md to a temp file:**
 ```bash
-git show <latest-tag>:<metadata.source.path>/SKILL.md
+git show <latest-tag>:<metadata.source.path>/SKILL.md > /tmp/upstream-SKILL.md
 ```
 (This is safe because `--tags --force` was just run, so local tags match remote.)
 
-**Step 3: Compare the local file on disk against the upstream file.**
+**Step 3: Run `diff` between the local file and the upstream file.**
 
-Read both files and identify the differences. This is the comparison that
-matters — NOT `git diff` between tags. The `git diff` between tags only tells
-you what changed in the repo between releases. But the local file may be very
-different from both tags due to user customizations.
+**Always use a diff tool — never compare files by reading them side by side.**
+Reading two files and mentally comparing them is error-prone: the AI can miss
+differences due to context window limits, long files, or subtle changes. A diff
+tool gives exact, deterministic output.
 
-If the local file and upstream file are **identical** (except possibly for
-`metadata.source` fields):
+```bash
+diff -u <skill-path>/SKILL.md /tmp/upstream-SKILL.md
+```
+
+The diff output shows every difference between what the user has and what
+upstream offers. The AI's job is to **interpret** the diff (which changes are
+user customizations to preserve, which are upstream content to add) — not to
+**detect** the differences. Detection is the diff tool's job.
+
+If the diff output is empty (no differences except possibly `metadata.source`
+fields):
 > `<skill-name>` is up to date.
 
 Then stop. Update `metadata.source.repo_tag` to the latest tag if needed.
 
-If there are **meaningful differences** between local and upstream:
+If there are **meaningful differences** in the diff output:
 
-1. **Read the upstream `metadata.version`** from the fetched file.
+1. **Read the upstream `metadata.version`** from the temp file.
 2. Display the version context to the user:
    > Update available for `<skill-name>`: v`<local-version>` → v`<upstream-version>`
    > (repo tag: `<user-repo-tag>` → `<latest-tag>`)
-3. Show a summary of the differences between local and upstream.
+3. Show the diff output (or a summary of it) to the user.
 4. Proceed to Phase 2.
 
 ### 1.6 Compare versions (helper)
@@ -398,41 +407,34 @@ This is always done. The base version (from the user's `repo_tag`) is optional
 context that helps determine which differences are user customizations — but
 even without a correct base, the local-vs-upstream comparison drives the merge.
 
-### 3.1 Get the local version (from disk)
+### 3.1 Diff local vs upstream (primary — use a diff tool)
 
-**Read the actual file on disk.** This is the user's current state — including
-any uncommitted edits, reverts, or manual changes. Do NOT use `git show HEAD:...`
-or any git command. Just read the file:
-
-```
-Read the file at: <skill-path>/SKILL.md
-```
-
-This is what the user actually sees and uses. This is the truth.
-
-### 3.2 Get the upstream version (from remote)
-
-This was already fetched in Phase 1.5. The upstream file at the latest tag is
-the **target** — this is what the local file should look like after the update,
-minus user customizations.
-
-### 3.3 Compare local vs upstream (primary comparison)
-
-**This is the most important step.** Read both files and identify every
-difference between them. This tells you exactly what needs to change.
-
-Do NOT skip this step based on `git diff` between tags. The `git diff` between
-tags only shows what changed in the repo — the local file may be very different
-from both tags.
-
-### 3.4 Get the base version (optional, helps classify differences)
-
-The base version helps answer: "Is this difference a user customization or
-missing upstream content?" Fetch from the remote at the user's `repo_tag`:
+The upstream file was already saved to a temp file in Phase 1.5. Now run
+`diff` to get the exact differences:
 
 ```bash
-git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md
+diff -u <skill-path>/SKILL.md /tmp/upstream-SKILL.md
 ```
+
+**This is the most important step.** The diff output is deterministic and
+exact — it catches every difference regardless of file length. Read the diff
+output carefully. This tells you everything that needs to change.
+
+**Never compare files by reading them side by side.** Always use a diff tool.
+The AI's job is to interpret the diff, not to detect differences.
+
+### 3.2 Diff local vs base (optional — helps classify differences)
+
+The base version helps answer: "Is this difference a user customization or
+missing upstream content?" Save the base to a temp file and diff against local:
+
+```bash
+git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md > /tmp/base-SKILL.md
+diff -u /tmp/base-SKILL.md <skill-path>/SKILL.md
+```
+
+This shows what the user changed from the base. Combined with the local-vs-upstream
+diff from 3.1, you can classify each difference.
 
 **Sanity check:** Verify the base version's `metadata.version` matches what
 the user's `repo_tag` implies. If the base file at tag `v1.0.0` says
@@ -440,9 +442,9 @@ the user's `repo_tag` implies. If the base file at tag `v1.0.0` says
 without a base (fall back to two-way comparison with user input).
 
 If the base is unavailable or unreliable, present the local-vs-upstream
-differences to the user and ask which to keep and which to update.
+diff to the user and ask which differences to keep and which to update.
 
-### 3.5 Categorize each difference
+### 3.3 Categorize each difference
 
 Compare base→local (user's edits) and base→upstream (new changes).
 
