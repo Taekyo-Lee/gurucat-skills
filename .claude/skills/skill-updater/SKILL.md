@@ -263,55 +263,55 @@ steps — never dead-end.
 Read `references/fetch-strategies.md` for per-strategy prerequisites, commands,
 failure mode tables, and user-facing messages.
 
-### 1.5 Check if the skill actually changed
+### 1.5 Fetch the upstream file and compare against local
 
-A new repo tag does NOT mean every skill changed. Fetch the upstream skill
-content **from the remote** at both the user's `repo_tag` and the latest tag,
-then compare.
+**The core job of skill-updater: make the local file match the upstream version
+at the latest tag, while preserving user customizations.**
 
-**Important:** Always fetch from the **remote**, not from local git objects.
-Local tags can be stale. The remote name may not be `origin` — find the remote
-whose URL matches `metadata.source.url` by checking `git remote -v`, then use
-that remote name in all git commands.
+The trigger for an update is simple: the user's `repo_tag` (from the file on
+disk) differs from the latest tag on the remote. Once triggered, the skill-updater
+must compare the **local file on disk** against the **upstream file from the
+remote** — this is the primary comparison that determines what to do.
 
-**Git flow (fetch from remote):**
+**Important:** The remote name may not be `origin` — find the remote whose URL
+matches `metadata.source.url` by checking `git remote -v`, then use that remote
+name in all git commands.
+
+**Step 1: Fetch tags from remote:**
 ```bash
-# Find the remote whose URL matches metadata.source.url
 git remote -v
-# Use the matching remote name (could be origin, internal, upstream, etc.)
+# Find the remote matching metadata.source.url
 
-# Ensure remote tags are up to date
 git fetch <remote> --tags --force
-
-# Compare using remote-tracking refs
-git diff <user-repo-tag> <latest-tag> -- <metadata.source.path>/
 ```
 
-**`gh` / API flow (always fetches from remote):**
+**Step 2: Fetch the upstream SKILL.md from the remote at the latest tag:**
 ```bash
-# Fetch file listing at each tag from remote
-gh api repos/<owner>/<repo>/contents/<path>?ref=<user-repo-tag> --jq '.[].name'
-gh api repos/<owner>/<repo>/contents/<path>?ref=<latest-tag> --jq '.[].name'
-
-# Fetch file content from remote
-gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<tag> --jq '.content' | base64 -d
+git show <latest-tag>:<metadata.source.path>/SKILL.md
 ```
+(This is safe because `--tags --force` was just run, so local tags match remote.)
 
-If the skill's files are **identical** between tags:
-> `<skill-name>` is up to date (repo tag `<latest-tag>`, no changes to this skill).
+**Step 3: Compare the local file on disk against the upstream file.**
 
-Then stop. Update `metadata.source.repo_tag` to the latest tag (so future
-checks skip these intermediate tags) but don't touch any skill content.
+Read both files and identify the differences. This is the comparison that
+matters — NOT `git diff` between tags. The `git diff` between tags only tells
+you what changed in the repo between releases. But the local file may be very
+different from both tags due to user customizations.
 
-If the skill's files **did change** between tags:
+If the local file and upstream file are **identical** (except possibly for
+`metadata.source` fields):
+> `<skill-name>` is up to date.
 
-1. **Read the upstream skill's `metadata.version`** from its SKILL.md fetched
-   from the remote at the latest tag. This is the per-skill version the user
-   will be updating to.
+Then stop. Update `metadata.source.repo_tag` to the latest tag if needed.
+
+If there are **meaningful differences** between local and upstream:
+
+1. **Read the upstream `metadata.version`** from the fetched file.
 2. Display the version context to the user:
    > Update available for `<skill-name>`: v`<local-version>` → v`<upstream-version>`
    > (repo tag: `<user-repo-tag>` → `<latest-tag>`)
-3. Proceed to Phase 2.
+3. Show a summary of the differences between local and upstream.
+4. Proceed to Phase 2.
 
 ### 1.6 Compare versions (helper)
 
@@ -390,49 +390,15 @@ the user has uncommitted changes.
 
 ## Phase 3: Detect changes
 
-Determine what the user customized and what upstream changed.
+**The goal: make the local file match the upstream version while preserving
+user customizations.**
 
-The goal is to compare three versions:
-- **Base**: the skill's content **fetched from the remote** at the user's
-  `metadata.source.repo_tag` (what they originally installed or last updated
-  from)
-- **Local**: the **actual files on disk** right now (base + their customizations)
-- **Upstream**: the skill's content **fetched from the remote** at the latest
-  repo tag
+The primary comparison is **local file on disk vs upstream file from remote**.
+This is always done. The base version (from the user's `repo_tag`) is optional
+context that helps determine which differences are user customizations — but
+even without a correct base, the local-vs-upstream comparison drives the merge.
 
-**Critical rule:** Local = file on disk. Base and Upstream = fetched from remote.
-Never use `git show <tag>:...` without the remote prefix — local tags can be
-stale. Never use `git log` or commit history to determine local state.
-
-### 3.1 Get the base version (from remote)
-
-Fetch the skill's files **from the remote** at the user's `repo_tag` (read
-from the SKILL.md file on disk in Phase 1.3).
-
-**Git flow (remote-aware):**
-```bash
-# Find the remote whose URL matches metadata.source.url
-# (could be origin, internal, upstream, etc.)
-git remote -v
-
-# Force-update local tags to match remote
-git fetch <remote> --tags --force
-
-# Now safe to use the tag — it matches remote after force-fetch
-git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md
-```
-
-**`gh` / API flow (always remote):**
-```bash
-gh api repos/<owner>/<repo>/contents/<path>/SKILL.md?ref=<metadata.source.repo_tag> \
-  --jq '.content' | base64 -d
-```
-
-If even this fails (e.g., tag was deleted, no network), treat every file as
-potentially edited by the user (worst case: full CONFLICT categorization,
-agent merges everything carefully).
-
-### 3.2 Get the local version (from disk)
+### 3.1 Get the local version (from disk)
 
 **Read the actual file on disk.** This is the user's current state — including
 any uncommitted edits, reverts, or manual changes. Do NOT use `git show HEAD:...`
@@ -444,13 +410,39 @@ Read the file at: <skill-path>/SKILL.md
 
 This is what the user actually sees and uses. This is the truth.
 
-### 3.3 Get the upstream version (from remote)
+### 3.2 Get the upstream version (from remote)
 
-Fetch the skill's files **from the remote** at the latest tag (found in
-Phase 1.4). Use the same method as 3.1 but with the latest tag instead of
-the user's `repo_tag`.
+This was already fetched in Phase 1.5. The upstream file at the latest tag is
+the **target** — this is what the local file should look like after the update,
+minus user customizations.
 
-### 3.4 Categorize each file
+### 3.3 Compare local vs upstream (primary comparison)
+
+**This is the most important step.** Read both files and identify every
+difference between them. This tells you exactly what needs to change.
+
+Do NOT skip this step based on `git diff` between tags. The `git diff` between
+tags only shows what changed in the repo — the local file may be very different
+from both tags.
+
+### 3.4 Get the base version (optional, helps classify differences)
+
+The base version helps answer: "Is this difference a user customization or
+missing upstream content?" Fetch from the remote at the user's `repo_tag`:
+
+```bash
+git show <metadata.source.repo_tag>:<metadata.source.path>/SKILL.md
+```
+
+**Sanity check:** Verify the base version's `metadata.version` matches what
+the user's `repo_tag` implies. If the base file at tag `v1.0.0` says
+`metadata.version: "1.1.0"`, the tag is misconfigured — warn and proceed
+without a base (fall back to two-way comparison with user input).
+
+If the base is unavailable or unreliable, present the local-vs-upstream
+differences to the user and ask which to keep and which to update.
+
+### 3.5 Categorize each difference
 
 Compare base→local (user's edits) and base→upstream (new changes).
 
