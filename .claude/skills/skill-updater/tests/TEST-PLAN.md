@@ -172,20 +172,41 @@ important test — it exercises every phase of the skill.
 
 ### Pass criteria
 
-- [ ] Samsung Blue (`#1428a0`) is preserved in the merged file
-- [ ] Dark Mode section is present in the merged file
-- [ ] Variable font weight line is present in Font Management
-- [ ] `metadata.version` is `"1.1.0"`
-- [ ] `metadata.source.repo_tag` is `"v1.1.0"`
-- [ ] `metadata.source.updated_at` is today's date
-- [ ] File-based backup exists
-- [ ] User was asked to confirm before changes were applied
-- [ ] Final report clearly shows what changed and what was preserved
-- [ ] Base and upstream were fetched from the remote (not local git tags)
+- [x] Samsung Blue (`#1428a0`) is preserved in the merged file
+- [x] Dark Mode section is present in the merged file
+- [x] Variable font weight line is present in Font Management
+- [x] `metadata.version` is `"1.1.0"`
+- [x] `metadata.source.repo_tag` is `"v1.1.0"`
+- [x] `metadata.source.updated_at` is today's date
+- [x] File-based backup exists
+- [x] User was asked to confirm before changes were applied
+- [x] Final report clearly shows what changed and what was preserved
+- [x] Base and upstream were fetched from the remote (not local git tags)
 
 ### Actual result
 
-> (to be filled after testing)
+> **PASS** (2026-04-09, Samsung corporate environment, 2nd attempt)
+>
+> All criteria met. The AI used `diff -u` to compare the local file against
+> the upstream file saved to a temp file — deterministic detection, no
+> context rot risk.
+>
+> **1st attempt (FAIL):** AI read both files and "mentally" compared them,
+> relied on `git diff v1.0.0 v1.1.0` between tags (which showed almost no
+> diff due to misconfigured v1.0.0 tag on Samsung remote). Concluded
+> "nothing to merge" and only updated metadata.
+>
+> **Fix applied:** Phase 1.5 and Phase 3 rewritten to:
+> 1. Save upstream file to temp file
+> 2. Run `diff -u local /tmp/upstream` (diff tool, not mental comparison)
+> 3. Compare local vs upstream directly (not tag-vs-tag)
+>
+> **2nd attempt (PASS):** AI used diff tool, found all differences (Dark
+> Mode, variable font weights, Samsung Blue), applied merge correctly,
+> preserved user's internal source URL.
+>
+> User customization preserved: `metadata.source.url` kept as Samsung
+> internal GitHub Enterprise URL.
 
 ---
 
