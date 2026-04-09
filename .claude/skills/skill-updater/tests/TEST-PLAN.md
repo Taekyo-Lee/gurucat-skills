@@ -35,7 +35,53 @@ messy local git history (dummy commits, merges, reverts).
 
 ---
 
-## Test 1: Happy Path Update (Everything Goes Right)
+## Test 1: `--check` Scan (Read-Only Status Report)
+
+### What it tests
+
+The `--check` flow: scanning all skills, reading their SKILL.md files on disk,
+classifying their origins, fetching upstream tags from the remote, and displaying
+a status table. This is read-only — it reports what updates are available but
+changes nothing. Run this first to verify the environment works.
+
+### Pre-conditions
+
+- `brand-guidelines` has `metadata.source` with a known upstream repo
+- `skill-updater` has `metadata.source` with the same upstream repo
+- Other skills in the environment may or may not have `metadata.source`
+
+### Invocation
+
+```
+/skill-updater --check
+```
+
+### Expected workflow
+
+1. Scans all known skill locations (user-scope + project-scope)
+2. **Reads each SKILL.md file on disk** to get version and repo_tag
+3. Classifies each skill's origin
+4. For skills with `metadata.source`, fetches latest repo tag from the remote
+5. Groups skills from the same repo to avoid redundant API calls
+6. Displays a status table showing version, repo tag, and status
+
+### Pass criteria
+
+- [ ] Finds both `brand-guidelines` and `skill-updater`
+- [ ] Shows correct `metadata.version` for each (read from file on disk)
+- [ ] Shows correct `metadata.source.repo_tag` for each (read from file on disk)
+- [ ] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
+- [ ] skill-updater shows "Up to date" (its files didn't change between repo tags v1.0.0 and v1.1.0)
+- [ ] Skills without `metadata.source` show appropriate status
+- [ ] Table is readable and well-formatted
+
+### Actual result
+
+> (to be filled after testing)
+
+---
+
+## Test 2: Happy Path Update (Everything Goes Right)
 
 ### What it tests
 
@@ -126,45 +172,34 @@ important test — it exercises every phase of the skill.
 
 ---
 
-## Test 2: `--check` Scan (Read-Only Status Report)
+## Test 3: Re-run After Successful Update (Idempotency)
 
 ### What it tests
 
-The `--check` flow: scanning all skills, reading their SKILL.md files on disk,
-classifying their origins, fetching upstream tags from the remote, and displaying
-a status table. This is read-only — it reports what updates are available but
-changes nothing.
+Verifies that running skill-updater again after a successful update correctly
+reports "up to date" — by reading the file on disk, not git history.
 
 ### Pre-conditions
 
-- `brand-guidelines` has `metadata.source` with a known upstream repo
-- `skill-updater` has `metadata.source` with the same upstream repo
-- Other skills in the environment may or may not have `metadata.source`
+- Test 2 completed successfully
+- brand-guidelines SKILL.md on disk has `version: "1.1.0"`, `repo_tag: "v1.1.0"`
 
 ### Invocation
 
 ```
-/skill-updater --check
+/skill-updater brand-guidelines
 ```
 
-### Expected workflow
+### Expected behavior
 
-1. Scans all known skill locations (user-scope + project-scope)
-2. **Reads each SKILL.md file on disk** to get version and repo_tag
-3. Classifies each skill's origin
-4. For skills with `metadata.source`, fetches latest repo tag from the remote
-5. Groups skills from the same repo to avoid redundant API calls
-6. Displays a status table showing version, repo tag, and status
+Skill-updater reads the file, sees `repo_tag: "v1.1.0"`, fetches tags from
+remote, finds `v1.1.0` is the latest → reports "up to date."
 
 ### Pass criteria
 
-- [ ] Finds both `brand-guidelines` and `skill-updater`
-- [ ] Shows correct `metadata.version` for each (read from file on disk)
-- [ ] Shows correct `metadata.source.repo_tag` for each (read from file on disk)
-- [ ] brand-guidelines shows "Update available" (1.0.0 → 1.1.0)
-- [ ] skill-updater shows "Up to date" (its files didn't change between repo tags v1.0.0 and v1.1.0)
-- [ ] Skills without `metadata.source` show appropriate status
-- [ ] Table is readable and well-formatted
+- [ ] Reads version info from the file on disk
+- [ ] Correctly reports "up to date"
+- [ ] Does NOT attempt to re-merge or modify files
 
 ### Actual result
 
@@ -172,17 +207,17 @@ changes nothing.
 
 ---
 
-## Test 3: `--revert` After Update (Undo an Update)
+## Test 4: `--revert` After Update (Undo an Update)
 
 ### What it tests
 
 The revert flow: restoring the skill to its pre-update state from the backup
-created in Test 1. This tests whether the user can safely undo an update if
+created in Test 2. This tests whether the user can safely undo an update if
 they're unhappy with the result.
 
 ### Pre-conditions
 
-- Test 1 has been completed successfully (brand-guidelines was updated)
+- Test 2 has been completed successfully (brand-guidelines was updated)
 - File-based backup `brand-guidelines.backup-*` exists
 - brand-guidelines is currently at v1.1.0 (post-update merged state)
 
@@ -208,49 +243,6 @@ they're unhappy with the result.
 - [ ] `metadata.source.repo_tag` is back to `"v1.0.0"`
 - [ ] Revert commit exists in git log
 - [ ] File-based backup was used (not git branch)
-
-### Actual result
-
-> (to be filled after testing)
-
----
-
-## Test 4: No Metadata (What Happens When Origin is Unknown)
-
-### What it tests
-
-The origin classification and interactive stamping workflow when a skill has
-no `metadata.source` block. Without source metadata, skill-updater doesn't
-know where to check for updates, so it must ask the user.
-
-### Pre-conditions
-
-- Create or find a skill with no `metadata.source` in its frontmatter
-- (Can simulate by temporarily removing `metadata.source` from a skill)
-
-### Invocation
-
-```
-/skill-updater <skill-without-source>
-```
-
-### Expected workflow
-
-1. Locates the skill
-2. **Reads the SKILL.md file on disk** — no `metadata.source` found
-3. Triggers the interactive stamping workflow
-4. Asks user where the skill came from (6 options)
-5. Based on answer:
-   - "I wrote it myself" → Reports "local skill, nothing to update"
-   - "From a GitHub repo" → Asks for URL, stamps metadata, proceeds
-
-### Pass criteria
-
-- [ ] Detects missing `metadata.source`
-- [ ] Asks the user about the skill's origin
-- [ ] Handles "user-authored" response correctly (no update, no stamp)
-- [ ] Handles "from GitHub" response correctly (stamps and proceeds)
-- [ ] Does NOT crash or dead-end
 
 ### Actual result
 
@@ -312,34 +304,42 @@ It should NOT:
 
 ---
 
-## Test 6: Re-run After Successful Update (Idempotency)
+## Test 6: No Metadata (What Happens When Origin is Unknown)
 
 ### What it tests
 
-Verifies that running skill-updater again after a successful update correctly
-reports "up to date" — by reading the file on disk, not git history.
+The origin classification and interactive stamping workflow when a skill has
+no `metadata.source` block. Without source metadata, skill-updater doesn't
+know where to check for updates, so it must ask the user.
 
 ### Pre-conditions
 
-- Test 1 completed successfully
-- brand-guidelines SKILL.md on disk has `version: "1.1.0"`, `repo_tag: "v1.1.0"`
+- Create or find a skill with no `metadata.source` in its frontmatter
+- (Can simulate by temporarily removing `metadata.source` from a skill)
 
 ### Invocation
 
 ```
-/skill-updater brand-guidelines
+/skill-updater <skill-without-source>
 ```
 
-### Expected behavior
+### Expected workflow
 
-Skill-updater reads the file, sees `repo_tag: "v1.1.0"`, fetches tags from
-remote, finds `v1.1.0` is the latest → reports "up to date."
+1. Locates the skill
+2. **Reads the SKILL.md file on disk** — no `metadata.source` found
+3. Triggers the interactive stamping workflow
+4. Asks user where the skill came from (6 options)
+5. Based on answer:
+   - "I wrote it myself" → Reports "local skill, nothing to update"
+   - "From a GitHub repo" → Asks for URL, stamps metadata, proceeds
 
 ### Pass criteria
 
-- [ ] Reads version info from the file on disk
-- [ ] Correctly reports "up to date"
-- [ ] Does NOT attempt to re-merge or modify files
+- [ ] Detects missing `metadata.source`
+- [ ] Asks the user about the skill's origin
+- [ ] Handles "user-authored" response correctly (no update, no stamp)
+- [ ] Handles "from GitHub" response correctly (stamps and proceeds)
+- [ ] Does NOT crash or dead-end
 
 ### Actual result
 
@@ -349,14 +349,18 @@ remote, finds `v1.1.0` is the latest → reports "up to date."
 
 ## Test Execution Order
 
-**At Samsung corporate environment:**
-1. **Test 2** (`--check` scan) — read-only, lowest risk
-2. **Test 1** (happy path update) — full workflow
-3. **Test 6** (re-run after update) — idempotency check
-4. **Test 3** (`--revert`) — undo the update
-5. **Test 5** (messy history) — robustness after revert + dummy commits
-6. **Test 4** (no metadata) — interactive stamping
-7. Samsung-specific edge cases (proxy, no `gh`, auth failures)
+Run the tests in order: 1 → 2 → 3 → 4 → 5 → 6.
+
+| Test | What | Why this order |
+|---|---|---|
+| 1 | `--check` scan | Read-only, lowest risk — verifies environment first |
+| 2 | Happy path update | Full workflow — the main test |
+| 3 | Re-run after update | Idempotency — depends on Test 2 succeeding |
+| 4 | `--revert` | Undo — depends on Test 2's backup |
+| 5 | Messy history | Robustness — needs messy state after Tests 2-4 |
+| 6 | No metadata | Interactive stamping — independent, run last |
+
+After all tests, run Samsung-specific edge cases (proxy, no `gh`, auth failures).
 
 ---
 
