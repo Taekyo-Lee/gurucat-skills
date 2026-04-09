@@ -293,17 +293,21 @@ they're unhappy with the result.
 
 ### Actual result
 
-> **PASS** (2026-04-09, Samsung corporate environment)
+> **PASS** (2026-04-09, Samsung corporate environment, 2nd attempt)
 >
-> All criteria met. Revert flow worked correctly: found backup, restored
-> with `cp -r`, committed the revert.
+> All criteria met. Full revert flow executed correctly:
+> - [x] Found file-based backup (`brand-guidelines.backup-20260409`)
+> - [x] Restored with `cp -r` (full directory)
+> - [x] Deleted backup directory after restore (cleanup)
+> - [x] Deleted local v1.1.0 tag (cleanup)
+> - [x] Committed the revert
+> - [x] Clean report showing version reverted and cleanup done
 >
 > **Known issue:** Natural language revert requests (e.g., "스킬 원상복구
 > 해줘") do NOT trigger the skill-updater skill automatically. The AI
-> handles the restore manually without loading the skill. Had to explicitly
-> say "skill-updater 스킬 사용해" to trigger the proper revert flow.
-> The skill description was refined but the trigger issue persists — this
-> is a platform-level limitation, not a skill design issue.
+> handles the restore manually without loading the skill. Adding
+> "(skill-updater 스킬 사용해서)" to the request triggers the skill
+> correctly. This is a platform-level limitation.
 
 ---
 
