@@ -55,14 +55,30 @@ This principle governs every phase of skill-updater:
 | Base version | Fetch from the **remote** at the user's `repo_tag` | `git show <tag>:...` (local tag, potentially stale) |
 | Upstream version | Fetch from the **remote** at the latest tag | `git show <tag>:...` (local tag, potentially stale) |
 
-**Why this matters:** Users make commits, reverts, merges, and messy edits.
-Local git tags can become stale and point to wrong commits. Even if a perfect
-merge was committed a minute ago, the user may have reverted the files without
-committing. If skill-updater trusted git history, it would incorrectly say
-"already up to date" — but the file on disk says otherwise.
+**Why this matters:** Git history on a local machine is unreliable. Users make
+commits, reverts, merges, and messy edits. On shared PCs (common in corporate
+environments), other people may have run git commands — creating random commits,
+tags, or branches while studying git. Local git history can be anything. The
+only reliable thing is the actual file on disk — that's what the user sees
+when they open it.
 
 The SKILL.md file is what the user actually sees and uses. That is the truth.
 Git is a tool for fetching remote content and creating backups, nothing more.
+
+**ABSOLUTELY FORBIDDEN — do NOT do any of these:**
+- Do NOT run `git log` or read commit messages to understand local state
+- Do NOT run `git show HEAD:...` to read the local file — read the file on disk
+- Do NOT run `git diff HEAD` or `git diff --cached` to detect local changes
+- Do NOT reference any commit hash, commit message, or git history
+- Do NOT use `git blame` or any history-based command
+
+**The ONLY git commands allowed are:**
+- `git remote -v` — to find the remote matching `metadata.source.url`
+- `git fetch <remote> --tags --force` — to sync tags from remote
+- `git show <tag>:<path>` — ONLY after `--tags --force`, to fetch upstream/base content
+- `git tag -l` — to list available tags
+- `git add` / `git commit` / `git branch` — for backup and committing results
+- `diff -u` — to compare files (not a git command, but the primary tool)
 
 ---
 
