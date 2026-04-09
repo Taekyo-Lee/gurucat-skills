@@ -45,6 +45,39 @@ Yes, and they often will. Example with a repo containing two skills:
 At `v1.2.0`, skill-A's `version` is `1.1.0` (unchanged since `v1.1.0`), but
 its `repo_tag` is `v1.2.0` (the latest release it was checked against).
 
+### Which metadata fields are required and which are optional?
+
+```yaml
+metadata:
+  version: "1.0.0"            # REQUIRED — the skill's own version
+  author: "DevTools Team"     # optional — credit for the skill author
+  source:                     # REQUIRED for updates (without this block,
+                              #   skill-updater doesn't know where to look)
+    repo: "owner/repo"        # REQUIRED — GitHub owner/repo identifier
+    url: "https://github.com/..."  # REQUIRED — full URL to the repo
+    path: ".claude/skills/x"  # REQUIRED — path to this skill within the repo
+    repo_tag: "v1.0.0"        # REQUIRED — which repo tag this skill was
+                              #   installed/updated from
+    updated_at: "2026-04-08"  # optional — date of last update (informational)
+```
+
+Summary:
+
+| Field | Required? | Why |
+|---|---|---|
+| `metadata.version` | Yes | Displayed to user, used in update reports |
+| `metadata.author` | No | Informational only, not used by skill-updater |
+| `metadata.source` (entire block) | Yes, for updates | Without it, skill-updater triggers the interactive stamping workflow to ask the user where the skill came from |
+| `metadata.source.repo` | Yes | Used by `gh` CLI to fetch tags and files |
+| `metadata.source.url` | Yes | Used to match git remotes and classify origin |
+| `metadata.source.path` | Yes | Tells skill-updater which files in the repo belong to this skill |
+| `metadata.source.repo_tag` | Yes | The baseline for three-way comparison — without it, skill-updater can't diff |
+| `metadata.source.updated_at` | No | Informational; auto-set after each update |
+
+If `metadata.source` is missing entirely, skill-updater won't crash — it will
+ask the user about the skill's origin and offer to stamp it (see Test 4 in the
+test plan).
+
 ---
 
 ## Testing
