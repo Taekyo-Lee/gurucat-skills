@@ -2,7 +2,7 @@
 
 ## Test Environment
 
-- **Repo:** `Taekyo-Lee/my-skills` (https://github.com/Taekyo-Lee/my-skills)
+- **Repo:** `Taekyo-Lee/my-skills` (https://github.samsungds.net/aiagent/experimental-skills)
 - **Remote:** local repo has `origin` pointing to the same URL as
   `metadata.source.url` in the SKILL.md file on disk. This makes the skill
   **Origin A** (git-cloned, full git flow available).
