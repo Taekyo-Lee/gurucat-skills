@@ -14,7 +14,7 @@ metadata:
   author: "DevTools Team"
   source:
     repo: "Taekyo-Lee/my-skills"
-    url: "https://github.com/Taekyo-Lee/my-skills"
+    url: "https://github.samsungds.net/aiagent/experimental-skills"
     path: ".claude/skills/skill-updater"
     repo_tag: "v1.0.0"
     updated_at: "2026-04-08"
