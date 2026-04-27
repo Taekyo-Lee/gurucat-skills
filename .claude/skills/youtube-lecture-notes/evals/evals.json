@@ -1,0 +1,17 @@
+{
+  "skill_name": "youtube-lecture-notes",
+  "evals": [
+    {"id": 0, "name": "long-stanford-gpu-lecture",
+     "prompt": "I want to actually learn from this Stanford lecture on GPUs and systems for ML, not just skim it: https://www.youtube.com/watch?v=izZba4UA7iY — give me proper study notes I can come back to.",
+     "files": []},
+    {"id": 1, "name": "anki-flashcards-3b1b",
+     "prompt": "can you make me anki flashcards from this lecture https://www.youtube.com/watch?v=aircAruvnKk so i can review on my phone",
+     "files": []},
+    {"id": 2, "name": "deep-dive-feynman-magnets",
+     "prompt": "Help me deep-dive this video: https://www.youtube.com/watch?v=wMFPe-DwULM — I want to walk away actually understanding it.",
+     "files": []},
+    {"id": 3, "name": "generalization-winston-howspeak",
+     "prompt": "make me lecture notes for https://www.youtube.com/watch?v=Unzc731iCUY please — Patrick Winston's How to Speak. I want to revisit the techniques.",
+     "files": []}
+  ]
+}
